@@ -1,0 +1,13 @@
+{
+  "name": "hillstreet-website",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": { "@sentry/browser": "11.9.0" },
+  "devDependencies": { "esbuild": "0.28.2" },
+  "engines": { "node": ">=22" }
+}
