@@ -1,0 +1,15 @@
+{
+  "downloads": 20,
+  "download_errors": [
+    {
+      "url": "https://fonts.googleapis.com",
+      "error": "HTTP Error 404: Not Found"
+    },
+    {
+      "url": "https://fonts.gstatic.com",
+      "error": "HTTP Error 404: Not Found"
+    }
+  ],
+  "missing_local_references": [],
+  "browser_tested": false
+}
