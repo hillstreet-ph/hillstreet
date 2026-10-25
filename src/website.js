@@ -2,7 +2,7 @@ import * as Sentry from '@sentry/browser';
 
 Sentry.init({
   dsn: 'https://a6de033c24b5114420e12ac732439c25@o4512041160015872.ingest.us.sentry.io/4512318811668480',
-  environment: location.hostname === 'hillstreet.pages.dev' ? 'production' : 'preview',
+  environment: ['hillstreet.space','www.hillstreet.space','hillstreet.pages.dev'].includes(location.hostname) ? 'production' : 'preview',
   release: 'hillstreet-website@1.0.0',
   sendDefaultPii: false,
   autoSessionTracking: false,
@@ -13,6 +13,25 @@ Sentry.init({
     return event;
   }
 });
+
+function enhanceContact() {
+  const form = document.querySelector('form:has([name="message"])');
+  if (!form) return false;
+  for (const [name, max] of Object.entries({name:120,email:254,company:200,message:5000})) {
+    const field = form.querySelector(`[name="${name}"]`);
+    if (field) { field.maxLength = max; field.required = name !== 'company'; }
+  }
+  if (!form.querySelector('[data-privacy-notice]')) {
+    const notice = document.createElement('p'); notice.dataset.privacyNotice = ''; notice.className = 'text-xs text-muted-foreground';
+    notice.append('Your inquiry is stored so our team can respond. ');
+    const link = document.createElement('a'); link.href = '/privacy.html'; link.textContent = 'How we use your data'; link.className = 'underline'; notice.append(link); form.append(notice);
+  }
+  return true;
+}
+if (!enhanceContact()) {
+  const observer = new MutationObserver(() => { if (enhanceContact()) observer.disconnect(); });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+}
 
 // Capture before the recovered React handler, which only simulated submission.
 document.addEventListener('submit', async event => {

@@ -1,4 +1,6 @@
 /*
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-1tRkQz3v3MxdrsYpN5Cke6bkC4UA/F9WQybTb0y2R0k=' 'sha256-4HgJtYaOWrz1Va/S6AAMzNnfFJ7WxTVRY9yvxXxzfco=' 'sha256-KuPM1OB31X2la7lNEqBur04JaaMNECXZI1WuZq8OYns='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; media-src 'self'; connect-src 'self' https://o4512041160015872.ingest.us.sentry.io; upgrade-insecure-requests
+  Strict-Transport-Security: max-age=31536000
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
