@@ -1,0 +1,15 @@
+{
+  "name": "hillstreet-ops",
+  "main": "worker.js",
+  "compatibility_date": "2026-10-25",
+  "workers_dev": false,
+  "r2_buckets": [
+    { "binding": "BACKUPS", "bucket_name": "hillstreet-website-backups" },
+    { "binding": "FILES", "bucket_name": "hillstreet-business-files" }
+  ],
+  "triggers": { "crons": ["17 * * * *", "25 18 * * *"] },
+  "vars": {
+    "SUPABASE_URL": "https://huadtiuuoiriqrjpjxhr.supabase.co",
+    "SENTRY_DSN": "https://a6de033c24b5114420e12ac732439c25@o4512041160015872.ingest.us.sentry.io/4512318811668480"
+  }
+}
