@@ -1,0 +1,21 @@
+name: Restore original public video
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and verify original video
+        run: |
+          curl --fail --location --retry 3 'https://app-c409skgy6hhd.appmedo.com/images/business-meeting-proof.mp4' --output site/images/business-meeting-proof.mp4
+          echo '277a090ca9290ca9bb326952b3916e0509fbef2f9a673fb4e99de1ddbdfb8f50  site/images/business-meeting-proof.mp4' | sha256sum --check
+      - name: Commit verified media
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add site/images/business-meeting-proof.mp4
+          git diff --cached --quiet || git commit -m "Restore original verified business meeting video"
+          git push
