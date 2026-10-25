@@ -80,3 +80,11 @@ Supabase already has pg_cron, pg_net, pgcrypto, supabase_vault, vector, pgmq and
 The shared Supabase advisor report contains 399 warnings on the wider platform. HillStreet's dedicated table has an informational RLS-without-policies finding, consistent with its server-only access. Direct PostgreSQL SSL enforcement is disabled at the shared-project level; this website uses HTTPS REST. Changing project-wide enforcement or unrelated schemas requires checking their other consumers first.
 
 Google Workspace Admin and inquiry email delivery remain deferred. Registrar-side DNSSEC remains pending. No paid plan upgrades were purchased. The shared Zero Trust organization was preserved; HillStreet has its own scoped Access application and policy.
+
+
+## Final setup evidence
+
+Thirteen automated tests and the production build passed. GitHub CI run 40237018380 passed. The initial Source recovery archive run 40237020444 succeeded, including full bundle verification, private offsite R2 upload, and GitHub artifact creation. Production deployment 5116e470-838a-4869-ae60-d0a7de0b9d8b succeeded for the operations commit. Sentry backup check-ins returned status ok. Both private buckets have public access disabled; Vault decrypted-secrets access is denied to anon and authenticated roles. Unauthenticated operations requests returned 403, and an Access-authenticated request without the Worker bearer credential returned 404.
+
+GitHub returned HTTP 403 for the requested main-branch protection update. Protected-branch enforcement is therefore not configured; it requires the appropriate repository/organization authorization or entitlement. No alternate identity or transport was used to bypass that refusal. Tests still gate Cloudflare Pages builds, and agents should use reviewed branches and PRs.
+
