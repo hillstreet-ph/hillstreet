@@ -79,7 +79,7 @@ Supabase already has pg_cron, pg_net, pgcrypto, supabase_vault, vector, pgmq and
 
 The shared Supabase advisor report contains 399 warnings on the wider platform. HillStreet's dedicated table has an informational RLS-without-policies finding, consistent with its server-only access. Direct PostgreSQL SSL enforcement is disabled at the shared-project level; this website uses HTTPS REST. Changing project-wide enforcement or unrelated schemas requires checking their other consumers first.
 
-Google Workspace Admin and inquiry email delivery remain deferred. Registrar-side DNSSEC remains pending. No paid plan upgrades were purchased. The shared Zero Trust organization was preserved; HillStreet has its own scoped Access application and policy.
+Google Workspace Admin and inquiry email delivery remain deferred. Registrar-side DNSSEC remains pending. No paid plan upgrades were purchased. The Zero Trust organization team name is open-hillstreet, with authentication domain https://open-hillstreet.cloudflareaccess.com. The team was renamed at the user's request; existing applications and policies were preserved. HillStreet has its own scoped Access application and policy. See CLOUDFLARE-ONE.md for enrollment.
 
 
 ## Final setup evidence

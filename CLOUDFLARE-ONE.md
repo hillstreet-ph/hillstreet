@@ -4,7 +4,7 @@ Verified October 26, 2026 (Asia/Manila).
 
 ## Account-side configuration
 
-The existing shared Zero Trust team is **quiet-water-0f69** at https://quiet-water-0f69.cloudflareaccess.com. Its name and existing applications were preserved. Cloudflare account two-factor authentication is enabled.
+The existing shared Zero Trust team is **open-hillstreet** at https://open-hillstreet.cloudflareaccess.com. The team name and authentication domain were renamed at the user's request; existing applications and policies were preserved. Cloudflare account two-factor authentication is enabled.
 
 - Enrollment app: 56e1729f-6498-4327-9533-ee5debcc8694, type warp.
 - Enrollment policy: 458c9bae-859d-4a0a-ab73-a546fa8bea72. Only tanauancharles1@gmail.com may enroll.
@@ -19,10 +19,12 @@ The existing shared Zero Trust team is **quiet-water-0f69** at https://quiet-wat
 
 The shared default profile, existing pinned-app bypass and private-network rule were preserved. WARP enrollment does not grant human access to the service-token-only HillStreet operations application.
 
+The Cloudflare identity-provider callback and WARP app domain were read back with the new team domain. The new /warp login redirects successfully, the new signing-certificate endpoint returns 200, and authenticated HillStreet operations health remains successful. Zero devices were enrolled at rename time, so no registered devices required migration. Any client manually configured with another team must be updated to **open-hillstreet** and authenticated again.
+
 ## Enroll your device
 
 1. Install the official Cloudflare One Client for your operating system: https://developers.cloudflare.com/cloudflare-one/team-and-resources/devices/cloudflare-one-client/downloads/
-2. Open the client, choose **Log in to Cloudflare Zero Trust** (desktop: Settings > Preferences > Account), and enter team name **quiet-water-0f69**.
+2. Open the client, choose **Log in to Cloudflare Zero Trust** (desktop: Settings > Preferences > Account), and enter team name **open-hillstreet**.
 3. Authenticate as **tanauancharles1@gmail.com** with the existing Cloudflare login and MFA. Approve the operating system's VPN permission, then connect.
 4. Confirm the client shows the correct organization and connected DNS-and-traffic mode. Verify the device appears in the Cloudflare One Devices dashboard.
 5. Check https://help.teams.cloudflare.com/ for Gateway connectivity and https://www.cloudflare.com/cdn-cgi/trace for tunnel status.
