@@ -15,7 +15,8 @@ The existing shared Zero Trust team is **open-hillstreet** at https://open-hills
 - DNS rule: 338a38b8-ce9f-43a2-8fa8-ef9505cce885. Owner-scoped blocking of recommended security categories: 68 178 80 83 176 175 117 131 134 151 153.
 - Automatic root certificate installation is enabled at account level. No devices were enrolled when changed.
 - Existing Gateway managed CA 3018b194-b373-408b-ba99-e0de19376aa4 expires July 4, 2031. SHA-256 fingerprint: F7:A6:70:8D:7D:D3:AA:53:14:48:2C:EE:5A:12:A0:50:68:F3:D8:C5:D5:86:F7:41:7F:EA:35:41:70:5B:E5:C3.
-- Temporary owner-scoped Do Not Inspect safeguard 5e549062-5c36-4ec6-814c-6b33c621a817 remains enabled until the first device's certificate trust and application compatibility are verified. DNS threat filtering and tunnel encryption remain configured. HTTPS content inspection, antivirus and DLP are not claimed active or validated.
+- Owner-scoped staged inspection rule 5e549062-5c36-4ec6-814c-6b33c621a817 now bypasses destinations except hillstreet.space and www.hillstreet.space. Android user CA installation was confirmed by the owner's Trusted credentials screenshot. Existing pinned-application bypass remains active. DNS threat filtering remains configured. Full-device HTTPS inspection, antivirus and DLP are not claimed active or validated.
+- Owner-only HTTP validation rule e13bc3fe-17c8-46cc-9cd3-2e670081316d blocks https://hillstreet.space/gateway-security-test after HTTPS inspection. Direct website requests return 404; an enrolled-device request should show a Gateway block page. This is a harmless diagnostic path, not a malicious site.
 
 The shared default profile, existing pinned-app bypass and private-network rule were preserved. WARP enrollment does not grant human access to the service-token-only HillStreet operations application.
 
@@ -30,9 +31,11 @@ The Cloudflare identity-provider callback and WARP app domain were read back wit
 5. Check https://help.teams.cloudflare.com/ for Gateway connectivity and https://www.cloudflare.com/cdn-cgi/trace for tunnel status.
 6. On supported Windows, macOS and Debian/Ubuntu clients, allow up to ten minutes for CA installation. macOS may require manually trusting the CA in System Keychain. iOS, Android, ChromeOS, Red Hat and applications using separate trust stores need manual certificate deployment as applicable.
 7. Validate ordinary browsing, HillStreet contact form, GitHub, Supabase, Sentry and any pinned-certificate applications. Test a Cloudflare documented security-category test domain from the enrolled device and confirm its Gateway block log.
-8. Only after trust and compatibility testing, review and disable the temporary owner TLS inspection safeguard. Add scoped HTTP threat/antivirus policies, preserve pinned-app exclusions, then retest. Never declare endpoint security complete from API configuration alone.
+8. With Cloudflare One connected, open https://hillstreet.space/ in Chrome: it should load without a certificate warning. Then open https://hillstreet.space/gateway-security-test: it should show Cloudflare Gateway's block page. A normal website 404 indicates inspection enforcement has not been demonstrated. Do not bypass certificate warnings.
+9. After the phone-side tests pass, expand the inspection allowlist only to explicitly tested destinations, preserving pinned-app exclusions. Full-device HTTP threat/antivirus rollout remains pending compatibility validation. Never declare endpoint security complete from API configuration alone.
+10. Android VPN permissions, Always-on VPN (if available), battery/background restrictions and local certificate trust are device-side settings, not remotely changed by the Cloudflare API. Enable lockdown only after connectivity tests pass. Keep timezone Asia/Manila (UTC+8). WARP routing is automatic; this account does not guarantee a Philippines exit IP.
 
-No device was connected during verification. Installation, local certificate trust, tunnel routing, real device DNS blocks, disk encryption, host firewall and endpoint posture remain unverified. This service does not replace endpoint antivirus, operating-system updates or device management. No paid plan was purchased.
+The Redmi A5 running Android 15 is enrolled and reports MASQUE registrations. Its recent check-ins were verified. The owner's screenshot confirms the account CA in Android's Trusted credentials > User store. Actual browser inspection and Gateway rule enforcement still require the phone-side test below. Disk encryption, host firewall and endpoint posture remain unverified. This service does not replace endpoint antivirus, operating-system updates or device management. No paid plan was purchased.
 
 ## Website verification
 
