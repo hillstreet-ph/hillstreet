@@ -1,44 +1,60 @@
 # HillStreet Agency production setup
 
-This is the standalone HillStreet Agency business website. It has no runtime dependency on Open-Connect and must not be combined with that application's marketplace or database resources.
+Verified October 26, 2026 (Asia/Manila).
 
-## Configured and verified previously
+## Live website and repository
 
-- Organization repository: https://github.com/hillstreet-ph/hillstreet (private).
-- Cloudflare Pages project: hillstreet, main production branch, site output, root functions directory.
-- Verified earlier preview: https://4c1118ff.hillstreet.pages.dev . This preview predates the security changes in this document.
-- Supabase open-platform: dedicated hillstreet_website_inquiries table, private server RPC, validation, atomic rate limit, and idempotent submissions.
-- Sentry hillstreet project: browser error reporting; server keys are not present in the client.
-- Earlier browser contact submission returned 201 and its database record was confirmed, then deleted.
+- Website: https://hillstreet.space/
+- www redirects to the HTTPS apex, preserving paths and query strings.
+- Private organization repository: https://github.com/hillstreet-ph/hillstreet
+- Cloudflare Pages project: hillstreet, production branch main, output site, root functions directory.
+- Production build command: npm test && npm run build. Automatic production deployments are enabled. The deployment-check branch supports preview builds.
+- Verified application commit: 57bb6a5928212e2d1a2fdd81b0b02c80c9dff06e. Production deployment ID: 2f47f281-ab0e-4bf1-9c89-f9664358c12f.
 
-## Added for the business domain
+The website is separate from Open-Connect. No marketplace resources or unrelated app services are included.
 
-Canonical URL, sitemap, robots.txt and organization structured data now target https://hillstreet.space/ . A data-use notice is linked from the contact form. The build generates a Content Security Policy with hashes for the captured inline scripts, allows only the site's own scripts, blocks framing and objects, and restricts outgoing connections to the site and Sentry. HSTS covers the current hostname, without includeSubDomains or preload. API responses disable caching and MIME sniffing. Dependabot updates cover npm and GitHub Actions.
+## Application integrations
 
-Seven local automated tests and the build pass. These latest changes are not verified on a new Cloudflare deployment because the current Cloudflare token is invalid.
+Supabase: open-platform / huadtiuuoiriqrjpjxhr. The dedicated public.hillstreet_website_inquiries table has RLS enabled and no anonymous read/write or submission RPC access. The Cloudflare contact endpoint validates fields, enforces the 16 KiB request size limit and applies an atomic limit of three inquiries per IP hash per ten minutes. Request IDs prevent duplicate submissions. The encrypted Supabase server key is bound only to Pages Functions, not shipped in browser code.
 
-## Live configuration blocked on credentials
+Sentry: hillstreet organization, hillstreet project. Browser error reporting is configured for production and preview. Contact form values are not deliberately attached to events. Session replay and performance tracing are not enabled. Sentry ingestion was verified earlier with HTTP 200.
 
-Cloudflare zone access returned HTTP 403 / Invalid access token on October 26, 2026. Reconnect the HillStreet Cloudflare account before changing DNS, TLS, WAF or Pages settings. Google Workspace Admin has no authenticated connection and requires an authentication configuration before connection.
+Inquiries are stored in Supabase for review. Automatic email delivery is not configured; Google Workspace Admin is intentionally pending at the user's request.
 
-Public DNS observed on October 26, 2026:
+## Cloudflare security
 
-- Nameservers: gigi.ns.cloudflare.com and evan.ns.cloudflare.com.
-- MX: smtp.google.com at priority 1, plus five registrar forwarding MX records.
-- SPF includes both _spf.google.com and spf.efwd.registrar-servers.com, with ~all.
-- DMARC: p=none; pct=100; adkim=s; aspf=s.
-- No TXT record at google._domainkey.hillstreet.space. Other DKIM selectors were not enumerated; the actual selector and key must be confirmed in Google Admin.
+- Apex and www are proxied CNAME records to hillstreet.pages.dev. Both Pages custom domains are active with active validation and verification.
+- SSL mode: Full (strict); minimum TLS 1.2; TLS 1.3 remains enabled.
+- Always Use HTTPS enabled. Development Mode disabled.
+- Cloudflare Free Managed Ruleset executes for the apex and www hosts.
+- Two host-scoped custom firewall rules block secret/admin probes and restrict methods to GET, HEAD, OPTIONS, plus POST /api/contact.
+- Canonical-host redirect sends www to https://hillstreet.space.
+- The site build generates CSP hashes for inline scripts, disallows arbitrary scripts and framing, and restricts network connections to the site and Sentry. HSTS covers the hostname without preload or includeSubDomains. MIME sniffing is disabled. API responses are not cached.
+- Existing platform DDoS protection is enabled; no paid security plan was purchased.
 
-Do not remove forwarding MX/SPF records or enforce DMARC rejection until the mail routing, sender inventory and DKIM state are confirmed. Existing email DNS was not changed.
+Ruleset IDs for maintenance:
 
-## Finish after access is restored
+- Custom firewall: f816d42c454a4c9d8162efaa0182932e
+- Managed firewall entrypoint: 982ce693814042f09090c8ae44fa1aae
+- Canonical-host redirect: 498f23f616fd4948803d80437c4acc23
 
-1. Inspect all zone records and existing Pages domain associations; preserve email, verification and unrelated service records.
-2. Build and test the latest commit in a preview, checking CSP, real contact submission, mobile menu, images, video, privacy page, and Sentry delivery.
-3. Attach hillstreet.space and www.hillstreet.space to the Pages project. Update only confirmed website DNS records after the custom-domain association is created. Verify certificate issuance and HTTPS before cutover.
-4. Configure a single canonical hostname with HTTPS redirect, TLS 1.2 or later and Full (strict) origin validation where applicable. Inspect existing zone rules before adding hostname-scoped WAF, method protections, bot controls or rate limits. Avoid overlapping rules and account-wide changes.
-5. Check DNSSEC at both Cloudflare and the registrar before enabling or changing DS records; never publish a guessed DS record.
-6. Confirm Workspace domain ownership, Gmail activation and mail routing. Obtain the exact DKIM selector/key from Google Admin. Validate SPF and DKIM alignment before increasing DMARC enforcement.
-7. Deploy the reviewed main commit, verify both apex and www routing, then enable automatic production deploys if desired.
+Inspect the current rules before future updates; do not overwrite unrelated rules. The general list-zones connector call returned an invalid-token error, but targeted domain DNS, Pages, zone settings and ruleset operations succeeded using the renewed HillStreet connection.
 
-Inquiries are stored for review in Supabase. Automatic email delivery and Google Workspace administration are not configured yet. Original React development sources remain unavailable; the captured application is compiled code plus the editable integration code added here.
+## Verification
+
+- Seven automated tests, local build and GitHub CI passed.
+- Production apex HTTP 200, HTTP-to-HTTPS 301, and www-to-apex 301 with path/query preservation.
+- Production contact request HTTP 201, exactly one confirmed database record, synthetic record deleted after verification.
+- Earlier idempotency and atomic rate-limit tests passed.
+- Secret-path probe and disallowed HTTP method returned 403.
+- Privacy page HTTP 200 and unknown page HTTP 404.
+- Browser at 390px: hero rendered, zero broken images, video readyState 4, privacy link present, mobile menu opened and closed, Contact navigation scrolled to the section. No page errors or console errors were reported by the final browser checks.
+- All original MX, SPF, DMARC and verification TXT records were re-read and preserved. Only the two website DNS records were changed.
+
+## Pending work deliberately separated from the launch
+
+Google Workspace Admin remains deferred. Current mail DNS still contains Google MX plus registrar forwarding MX records, SPF for both providers, monitoring-only DMARC, and no TXT at the default google._domainkey selector. Confirm actual mail routing and the intended DKIM selector/key in Google Admin before changing these records or enforcing DMARC rejection.
+
+DNSSEC is disabled. Registrar-side DS configuration must be arranged and validated before treating DNSSEC as complete. No registrar credentials were used or nameservers changed.
+
+The captured core application remains compiled React code; the original editable React source components and source maps were not exposed by the source website. Integration code, contact backend, tests and build configuration are editable in this repository.

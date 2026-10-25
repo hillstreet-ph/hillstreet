@@ -13,20 +13,13 @@ python3 -m http.server 8080 --directory site
 
 Open http://localhost:8080. Serve over HTTP rather than opening the HTML file directly. No Node installation or build step is required for the deployed JavaScript bundle.
 
-## Upload to GitHub
+## Production website
 
-Extract this archive, create an empty GitHub repository, and run these commands inside this folder, replacing the example URL:
+Live: https://hillstreet.space/
 
-```sh
-git init
-git add .
-git commit -m "Archive public HillStreet frontend"
-git branch -M main
-git remote add origin https://github.com/hillstreet-ph/hillstreet.git
-git push -u origin main
-```
+Repository: https://github.com/hillstreet-ph/hillstreet . Current Cloudflare, Supabase, Sentry, security settings and verification results are in [PRODUCTION-SETUP.md](PRODUCTION-SETUP.md).
 
-For GitHub Pages, open Settings > Pages, choose GitHub Actions, and run the included deployment workflow. The workflow publishes only `site/`. Root-relative image paths require hosting at a domain root; the included workflow rewrites these paths for repository Pages hosting during deployment.
+Run npm ci, npm test and npm run build before deploying. Cloudflare Pages runs npm test && npm run build automatically on main and publishes site/ with root functions/.
 
 ## Included files
 
@@ -47,7 +40,7 @@ The recovered contact form has been upgraded to POST /api/contact. Cloudflare va
 
 The Medo runtime injection is omitted from the standalone entry point to avoid coupling the copy to the original hosted app. It remains preserved in the original capture. External social, portfolio, Canva and contact destinations remain external. Platform font-catalog assets may remain remote; the site's requested Google font files are downloaded when available.
 
-Validation covers downloaded file presence and local HTML/CSS/media references. Browser appearance, interactive behavior and external integrations have not been fully tested. This is a frontend recovery archive, not a verified full application clone.
+The production site, contact database write, redirects, CSP/security headers, firewall responses, mobile menu, images and video have been tested. See PRODUCTION-SETUP.md for exact evidence and remaining limits. Original development source recovery remains incomplete.
 
 Only publish code and media you have permission to use. Original ownership and licensing remain with their respective owners.
 
@@ -62,4 +55,4 @@ Supabase project: `open-platform` (`huadtiuuoiriqrjpjxhr`). Dedicated table: `pu
 
 Sentry: organization `hillstreet`, project `hillstreet`. Browser errors use the public DSN. Session tracking, replay and performance tracing are not enabled. Request query strings and contact form values are excluded from the configured event pipeline. No original React source maps were available.
 
-Use a preview deployment to verify navigation, mobile layout, contact submission and Sentry errors before promoting production. Production automatic deployments are initially disabled. No custom domain or DNS was changed.
+The business domain is deployed and verified. Automatic production deployments are enabled. Website DNS was updated; email DNS was preserved. Google Workspace Admin is deferred and registrar-side DNSSEC remains pending.
