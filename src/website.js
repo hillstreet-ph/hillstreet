@@ -24,7 +24,7 @@ function enhanceContact() {
   if (!form.querySelector('[data-privacy-notice]')) {
     const notice = document.createElement('p'); notice.dataset.privacyNotice = ''; notice.className = 'text-xs text-muted-foreground';
     notice.append('Your inquiry is stored so our team can respond. ');
-    const link = document.createElement('a'); link.href = '/privacy.html'; link.textContent = 'How we use your data'; link.className = 'underline'; notice.append(link); form.append(notice);
+    const link = document.createElement('a'); link.href = '/privacy'; link.textContent = 'How we use your data'; link.className = 'underline'; notice.append(link); form.append(notice);
   }
   return true;
 }
