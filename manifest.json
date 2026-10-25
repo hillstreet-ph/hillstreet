@@ -1,0 +1,150 @@
+[
+  {
+    "url": "https://app-c409skgy6hhd.appmedo.com/images/business-meeting-proof.mp4",
+    "path": "images/business-meeting-proof.mp4",
+    "bytes": 12236656,
+    "content_type": "video/mp4",
+    "sha256": "277a090ca9290ca9bb326952b3916e0509fbef2f9a673fb4e99de1ddbdfb8f50"
+  },
+  {
+    "url": "https://app-c409skgy6hhd.appmedo.com/images/hero-business-cooperation.png",
+    "path": "images/hero-business-cooperation.png",
+    "bytes": 1233486,
+    "content_type": "image/png",
+    "sha256": "43e2d229d3067d3460fa8414e35824c17eb7dd94ffcee51c37716b7a1d8113a8"
+  },
+  {
+    "url": "https://app-c409skgy6hhd.appmedo.com/images/hero-generated.png",
+    "path": "images/hero-generated.png",
+    "bytes": 572676,
+    "content_type": "image/png",
+    "sha256": "7215358d191de89d6b97b035509e02613a236023695c96146e625f578e3c4a6f"
+  },
+  {
+    "url": "https://app-c409skgy6hhd.appmedo.com/images/logo-hillstreet.png",
+    "path": "images/logo-hillstreet.png",
+    "bytes": 399652,
+    "content_type": "image/png",
+    "sha256": "9e958f1b8f6e2bb0cda89e2a93134fab35fa32763db11e7723c81a5aa6b7f598"
+  },
+  {
+    "url": "https://app-c409skgy6hhd.appmedo.com/images/profile-master-kanor.jpg",
+    "path": "images/profile-master-kanor.jpg",
+    "bytes": 204928,
+    "content_type": "image/jpeg",
+    "sha256": "b28d14b46d3b8472762bd2f685b705272c67961e6d8b5d11758dba8a524ba283"
+  },
+  {
+    "url": "https://fonts.googleapis.com",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "url": "https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap",
+    "path": "vendor/e8f8e5801b-css2.css",
+    "bytes": 1908,
+    "content_type": "text/css; charset=utf-8",
+    "sha256": "03d5cb5cb34eef292926b6bfd9d7332e6890f1e9f57fd8e54ed9228dbe266ae8"
+  },
+  {
+    "url": "https://fonts.gstatic.com",
+    "error": "HTTP Error 404: Not Found"
+  },
+  {
+    "url": "https://job-manager-artifacts-online.s3cdn.medo.dev/prod/artifacts/ad898749-9f82-4956-8dd8-7e66a5b79921/app-c409skgy6hhd_web_1792959368853.png",
+    "path": "vendor/7e41651900-app-c409skgy6hhd_web_1792959368853.png",
+    "bytes": 373328,
+    "content_type": "binary/octet-stream",
+    "sha256": "b325c76e580254dfac1ed1905e541d6f873138fc242363df6d1359c0313c46ff"
+  },
+  {
+    "url": "https://miaoda-font.cdn.bcebos.com/static/font_v1/fonts-code.css",
+    "path": "vendor/92c41a3a2a-fonts-code.css",
+    "bytes": 123671,
+    "content_type": "text/css",
+    "sha256": "43edd8d087fae24f7199ba6a544c26bd8c71fa69a43aefa95036889f37e705a9"
+  },
+  {
+    "url": "https://miaoda-op-sourcecode.s3cdn.medo.dev/source_code/projects/conv-c409skgy6hhc_1792959347834/assets/index-D4yBHoPu.js",
+    "path": "assets/index-D4yBHoPu.js",
+    "bytes": 360335,
+    "content_type": "application/javascript",
+    "sha256": "69ff374f8c0756e81e8faccc3131ad84925ac04435f3566cd7c7576ff85ea4da"
+  },
+  {
+    "url": "https://miaoda-op-sourcecode.s3cdn.medo.dev/source_code/projects/conv-c409skgy6hhc_1792959347834/assets/index-DwciAvas.css",
+    "path": "assets/index-DwciAvas.css",
+    "bytes": 70982,
+    "content_type": "text/css",
+    "sha256": "64536fb86f762664848748e5559e0e2abdd91fecd0c12d416bdc2c1af5391a79"
+  },
+  {
+    "url": "https://miaoda-resource-static.s3cdn.medo.dev/img/close.svg",
+    "path": "vendor/26550f6c0c-close.svg",
+    "bytes": 362,
+    "content_type": "image/svg+xml",
+    "sha256": "50b47831f47cc5ad45c5aa94313e9f0359727f66954be0da7d6b78e8432288c2"
+  },
+  {
+    "url": "https://miaoda-resource-static.s3cdn.medo.dev/img/favicon.png",
+    "path": "vendor/13aef68308-favicon.png",
+    "bytes": 5560,
+    "content_type": "image/png",
+    "sha256": "2b2e047df5eaec344c5a34ec103ac0a32ac6a359ea17089beb1d8550a314f423"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8-qxjPQ.ttf",
+    "path": "vendor/655ecee898-tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8-qxjPQ.ttf",
+    "bytes": 112204,
+    "content_type": "font/ttf",
+    "sha256": "3386a05f6ece969e4537de6be894170d20558e82f7d56c8c5d332972ef172160"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8FqtjPQ.ttf",
+    "path": "vendor/5f6675d606-tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8FqtjPQ.ttf",
+    "bytes": 112160,
+    "content_type": "font/ttf",
+    "sha256": "df54dbfafba61d4911eb3dab9bba2d20531fb009f01d64dd42fa96ab862584d8"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPQ.ttf",
+    "path": "vendor/6d83b1a122-tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPQ.ttf",
+    "bytes": 112172,
+    "content_type": "font/ttf",
+    "sha256": "44ce4a84f20d60f24539bd0cef11f79c29e38609e0f8adf18551c9794a5d9dc3"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj42Vksj.ttf",
+    "path": "vendor/d03f1389be-V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj42Vksj.ttf",
+    "bytes": 69356,
+    "content_type": "font/ttf",
+    "sha256": "6c0346b8d297ebdc225832833e03e884a26ad99d265ecd3924d46e1ba285ea87"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj4PVksj.ttf",
+    "path": "vendor/aaf352f017-V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj4PVksj.ttf",
+    "bytes": 69308,
+    "content_type": "font/ttf",
+    "sha256": "3e756954468ff1cb302dae0414262e72f76a67d87bef3fa1f3226cd0fb9b2d85"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj62UUsj.ttf",
+    "path": "vendor/aab63435a0-V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj62UUsj.ttf",
+    "bytes": 69400,
+    "content_type": "font/ttf",
+    "sha256": "2f29b31d803a928d21f96dbe7a5f8bfa5c5c98917736c2d195bc7c737bc906ba"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7aUUsj.ttf",
+    "path": "vendor/56632cca66-V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7aUUsj.ttf",
+    "bytes": 69416,
+    "content_type": "font/ttf",
+    "sha256": "3e699ead1876244fa392243054ddefe7cf631b488438828a8a100731a22ab995"
+  },
+  {
+    "url": "https://fonts.gstatic.com/s/spacegrotesk/v22/V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7oUUsj.ttf",
+    "path": "vendor/0dfc29fde7-V8mQoQDjQSkFtoMM3T6r8E7mF71Q-gOoraIAEj7oUUsj.ttf",
+    "bytes": 69360,
+    "content_type": "font/ttf",
+    "sha256": "ec926d5065eaca49a48f96e312bbae0bbc5733c24215cf5dfabbdccee926fef7"
+  }
+]
