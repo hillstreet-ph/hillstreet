@@ -29,7 +29,7 @@ Inquiries are stored in Supabase for review. Automatic email delivery is not con
 - Cloudflare Free Managed Ruleset executes for the apex and www hosts.
 - Two host-scoped custom firewall rules block secret/admin probes and restrict methods to GET, HEAD, OPTIONS, plus POST /api/contact.
 - Canonical-host redirect sends www to https://hillstreet.space.
-- The site build generates CSP hashes for inline scripts, disallows arbitrary scripts and framing, and restricts network connections to the site and Sentry. HSTS covers the hostname without preload or includeSubDomains. MIME sniffing is disabled. API responses are not cached.
+- The site build generates CSP hashes for inline scripts, disallows arbitrary scripts and framing, and restricts network connections to the site and Sentry. HSTS covers the hostname without preload or includeSubDomains and is enabled at the Cloudflare edge as well as in the site headers. MIME sniffing is disabled. API responses are not cached.
 - Existing platform DDoS protection is enabled; no paid security plan was purchased.
 
 Ruleset IDs for maintenance:
@@ -55,6 +55,6 @@ Inspect the current rules before future updates; do not overwrite unrelated rule
 
 Google Workspace Admin remains deferred. Current mail DNS still contains Google MX plus registrar forwarding MX records, SPF for both providers, monitoring-only DMARC, and no TXT at the default google._domainkey selector. Confirm actual mail routing and the intended DKIM selector/key in Google Admin before changing these records or enforcing DMARC rejection.
 
-DNSSEC is disabled. Registrar-side DS configuration must be arranged and validated before treating DNSSEC as complete. No registrar credentials were used or nameservers changed.
+Cloudflare DNSSEC signing is enabled and pending the registrar DS record. Public signatures and DNSKEY records are visible, but the parent DS is absent, so the chain of trust is not complete. See DOMAIN-SECURITY.md for the exact Namecheap handoff. No registrar credentials were used or nameservers changed.
 
 The captured core application remains compiled React code; the original editable React source components and source maps were not exposed by the source website. Integration code, contact backend, tests and build configuration are editable in this repository.

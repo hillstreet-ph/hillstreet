@@ -1,0 +1,41 @@
+# HillStreet domain security
+
+Verified October 26, 2026 (Asia/Manila). This audit covers hillstreet.space, www.hillstreet.space, ops.hillstreet.space and open-hillstreet.cloudflareaccess.com.
+
+## Applied fixes and verified state
+
+Cloudflare edge HSTS is now enabled with max-age 31536000, without includeSubDomains or preload, and with nosniff enabled. HTTPS apex responses, www redirects and Access-denied operations responses were checked for these headers. The website already sent HSTS; the edge configuration now also covers responses generated before the website application.
+
+Full strict SSL, minimum TLS 1.2, TLS 1.3, HTTP/2, HTTP/3, Always Use HTTPS, automatic HTTPS rewrites and Browser Integrity Check are enabled. Development Mode is off. Existing host-scoped WAF rules and operations Access protection are preserved. Both Pages domains are active with active verification and validation.
+
+Public apex returns 200, HTTP redirects to HTTPS, www redirects to apex, unauthenticated operations returns 403 and authenticated operations health returns 200 with site 200 and contact validation 400. The Zero Trust enrollment URL redirects to the current open-hillstreet login.
+
+## DNSSEC: Cloudflare signing enabled, registrar step pending
+
+Cloudflare accepted DNSSEC activation and currently reports pending. Public DNS answers contain RRSIG signatures and DNSKEY records. The parent DS lookup returned no DS record and the public resolver did not mark the answer authenticated. DNSSEC is not complete until the registrar publishes the exact DS and validation succeeds.
+
+In Namecheap, open Domain List > Manage for hillstreet.space > Advanced DNS > DNSSEC. Enable DNSSEC and add a DS record using:
+
+| Field | Value |
+| --- | --- |
+| Key tag | 2371 |
+| Algorithm | 13 — ECDSAP256SHA256 |
+| Digest type | 2 — SHA-256 |
+| Digest | 691373E48E49A4F07F0E2B9958DF8B69EE6DF52AF2295B5D0A8AE03C3AE453F2 |
+
+Full DS record:
+
+```text
+hillstreet.space. 3600 IN DS 2371 13 2 691373E48E49A4F07F0E2B9958DF8B69EE6DF52AF2295B5D0A8AE03C3AE453F2
+```
+
+Add this at the registrar, not as an ordinary Cloudflare DNS record. Preserve the current Cloudflare nameservers. No registrar connection was available, so no Namecheap changes were made. After saving, verify the parent DS matches, Cloudflare reports active and a validating resolver returns authenticated answers without SERVFAIL. Refresh the DS from Cloudflare before future registrar changes if signing keys have changed.
+
+Registrar guide: https://www.namecheap.com/support/knowledgebase/article.aspx/9722/2232/managing-dnssec-for-domains-pointed-to-custom-dns/
+Cloudflare DNSSEC states: https://developers.cloudflare.com/dns/dnssec/dnssec-states/
+
+## Preserved mail routing and remaining limits
+
+Google Workspace Admin remains deferred. Existing Google SMTP MX and registrar forwarding MX, SPF and monitoring-only DMARC were preserved. No guessed DKIM key or mail-routing change was applied. Resolve the intended mail provider and inspect Google Admin before cleaning up these records or enforcing DMARC rejection.
+
+GitHub branch protection remains blocked by its previously reported HTTP 403. BrowserAct invocation through Open-Connect remains blocked by an internal route error. Android HTTPS inspection was verified for the HillStreet pilot only; broader application compatibility and local Always-on VPN/lockdown settings are separate checks. These limits prevent an honest claim of universal 100% completion.
