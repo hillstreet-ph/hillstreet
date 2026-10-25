@@ -1,0 +1,42 @@
+name: Source recovery archive
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '40 18 * * 0'
+permissions:
+  contents: read
+jobs:
+  archive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Create and verify full Git recovery bundle
+        run: |
+          git bundle create hillstreet-source.bundle --all
+          git bundle verify hillstreet-source.bundle
+          sha256sum hillstreet-source.bundle > hillstreet-source.sha256
+      - name: Copy source archive to private offsite R2 storage
+        env:
+          OPS_CLIENT_ID: ${{ secrets.HILLSTREET_OPS_CLIENT_ID }}
+          OPS_CLIENT_SECRET: ${{ secrets.HILLSTREET_OPS_CLIENT_SECRET }}
+          OPS_TOKEN: ${{ secrets.HILLSTREET_OPS_TOKEN }}
+        run: |
+          archive_hash=$(sha256sum hillstreet-source.bundle | cut -d ' ' -f 1)
+          curl --fail-with-body --retry 2 --request POST \
+            --header "CF-Access-Client-Id: $OPS_CLIENT_ID" \
+            --header "CF-Access-Client-Secret: $OPS_CLIENT_SECRET" \
+            --header "Authorization: Bearer $OPS_TOKEN" \
+            --header "X-Backup-Sha256: $archive_hash" \
+            --header 'Content-Type: application/octet-stream' \
+            --data-binary @hillstreet-source.bundle \
+            https://ops.hillstreet.space/source-backup
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hillstreet-source-${{ github.run_id }}
+          path: |
+            hillstreet-source.bundle
+            hillstreet-source.sha256
+          retention-days: 30
