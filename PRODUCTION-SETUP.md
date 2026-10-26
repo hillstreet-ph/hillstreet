@@ -55,6 +55,6 @@ Inspect the current rules before future updates; do not overwrite unrelated rule
 
 Google Workspace Admin remains deferred. Current mail DNS still contains Google MX plus registrar forwarding MX records, SPF for both providers, monitoring-only DMARC, and no TXT at the default google._domainkey selector. Confirm actual mail routing and the intended DKIM selector/key in Google Admin before changing these records or enforcing DMARC rejection.
 
-Cloudflare DNSSEC signing is enabled and pending the registrar DS record. Public signatures and DNSKEY records are visible, but the parent DS is absent, so the chain of trust is not complete. See DOMAIN-SECURITY.md for the exact Namecheap handoff. No registrar credentials were used or nameservers changed.
+DNSSEC is active. The registry DS matches Cloudflare, and both Cloudflare and Google public resolvers return authenticated answers. See DOMAIN-SECURITY.md for the verified record and recovery details. No agent registrar credentials were used or nameservers changed.
 
 The captured core application remains compiled React code; the original editable React source components and source maps were not exposed by the source website. Integration code, contact backend, tests and build configuration are editable in this repository.

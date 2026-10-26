@@ -10,11 +10,11 @@ Full strict SSL, minimum TLS 1.2, TLS 1.3, HTTP/2, HTTP/3, Always Use HTTPS, aut
 
 Public apex returns 200, HTTP redirects to HTTPS, www redirects to apex, unauthenticated operations returns 403 and authenticated operations health returns 200 with site 200 and contact validation 400. The Zero Trust enrollment URL redirects to the current open-hillstreet login.
 
-## DNSSEC: Cloudflare signing enabled, registrar step pending
+## DNSSEC: active and publicly validated
 
-Cloudflare accepted DNSSEC activation and currently reports pending. Public DNS answers contain RRSIG signatures and DNSKEY records. The parent DS lookup returned no DS record and the public resolver did not mark the answer authenticated. DNSSEC is not complete until the registrar publishes the exact DS and validation succeeds.
+Cloudflare reports DNSSEC active. The registry publishes the exact matching DS record, and both Cloudflare and Google public resolvers return authenticated A-record answers (AD=true, status 0). Public signatures and DNSKEY records are visible. The domain's DNSSEC chain is validated.
 
-In Namecheap, open Domain List > Manage for hillstreet.space > Advanced DNS > DNSSEC. Enable DNSSEC and add a DS record using:
+The owner published the following DS at Namecheap. These values are retained for recovery; do not create a duplicate or change the current record:
 
 | Field | Value |
 | --- | --- |
@@ -29,7 +29,7 @@ Full DS record:
 hillstreet.space. 3600 IN DS 2371 13 2 691373E48E49A4F07F0E2B9958DF8B69EE6DF52AF2295B5D0A8AE03C3AE453F2
 ```
 
-Add this at the registrar, not as an ordinary Cloudflare DNS record. Preserve the current Cloudflare nameservers. No registrar connection was available, so no Namecheap changes were made. After saving, verify the parent DS matches, Cloudflare reports active and a validating resolver returns authenticated answers without SERVFAIL. Refresh the DS from Cloudflare before future registrar changes if signing keys have changed.
+The DS belongs at the registrar, not as an ordinary Cloudflare DNS record. Preserve the current Cloudflare nameservers. The owner's manual registrar update was verified through the registry and public validation; no agent registrar credentials were used. Refresh DS details from Cloudflare before any future registrar changes if signing keys have changed.
 
 Registrar guide: https://www.namecheap.com/support/knowledgebase/article.aspx/9722/2232/managing-dnssec-for-domains-pointed-to-custom-dns/
 Cloudflare DNSSEC states: https://developers.cloudflare.com/dns/dnssec/dnssec-states/

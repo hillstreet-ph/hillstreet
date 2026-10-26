@@ -79,7 +79,7 @@ Supabase already has pg_cron, pg_net, pgcrypto, supabase_vault, vector, pgmq and
 
 The shared Supabase advisor report contains 399 warnings on the wider platform. HillStreet's dedicated table has an informational RLS-without-policies finding, consistent with its server-only access. Direct PostgreSQL SSL enforcement is disabled at the shared-project level; this website uses HTTPS REST. Changing project-wide enforcement or unrelated schemas requires checking their other consumers first.
 
-Google Workspace Admin and inquiry email delivery remain deferred. Cloudflare DNSSEC signing is enabled; registrar-side DS publication and chain validation remain pending. See DOMAIN-SECURITY.md. No paid plan upgrades were purchased. The Zero Trust organization team name is open-hillstreet, with authentication domain https://open-hillstreet.cloudflareaccess.com. The team was renamed at the user's request; existing applications and policies were preserved. HillStreet has its own scoped Access application and policy. See CLOUDFLARE-ONE.md for enrollment.
+Google Workspace Admin and inquiry email delivery remain deferred. DNSSEC is active; the matching registry DS and authenticated answers from Cloudflare and Google public resolvers were verified. See DOMAIN-SECURITY.md. No paid plan upgrades were purchased. The Zero Trust organization team name is open-hillstreet, with authentication domain https://open-hillstreet.cloudflareaccess.com. The team was renamed at the user's request; existing applications and policies were preserved. HillStreet has its own scoped Access application and policy. See CLOUDFLARE-ONE.md for enrollment.
 
 
 ## Final setup evidence
@@ -88,3 +88,7 @@ Thirteen automated tests and the production build passed. GitHub CI run 40237018
 
 GitHub returned HTTP 403 for the requested main-branch protection update. Protected-branch enforcement is therefore not configured; it requires the appropriate repository/organization authorization or entitlement. No alternate identity or transport was used to bypass that refusal. Tests still gate Cloudflare Pages builds, and agents should use reviewed branches and PRs.
 
+
+## October 26 Cloudflare audit (Asia/Manila)
+
+Worker hillstreet-ops serves 100% version 5085af8a-a8de-41b8-9d72-29c91a411452. Both hourly health and daily backup cron schedules were read back. Both R2 buckets remain private, and only scoped backup prefixes expire after 90 days. A fresh manual inquiry/private-file backup succeeded at 08:16 Manila with SHA-256 readback verification; the table and business-files bucket were empty (zero rows and zero files). This validates the configured path on empty current data; earlier recovery-fixture testing is documented above. Authenticated operations health passed. DNSSEC is now active and authenticated through both checked public resolvers. No Worker code change or redeployment was needed in this audit.
