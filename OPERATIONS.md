@@ -92,3 +92,7 @@ GitHub returned HTTP 403 for the requested main-branch protection update. Protec
 ## October 26 Cloudflare audit (Asia/Manila)
 
 Worker hillstreet-ops serves 100% version 5085af8a-a8de-41b8-9d72-29c91a411452. Both hourly health and daily backup cron schedules were read back. Both R2 buckets remain private, and only scoped backup prefixes expire after 90 days. A fresh manual inquiry/private-file backup succeeded at 08:16 Manila with SHA-256 readback verification; the table and business-files bucket were empty (zero rows and zero files). This validates the configured path on empty current data; earlier recovery-fixture testing is documented above. Authenticated operations health passed. DNSSEC is now active and authenticated through both checked public resolvers. No Worker code change or redeployment was needed in this audit.
+
+## Confirmed GitHub entitlement requirement
+
+The organization reports GitHub Free and main remains unprotected. GitHub's branch-protection endpoint explicitly requires a plan upgrade or public visibility. Keep this repository private: upgrading the organization to GitHub Team or Enterprise is required before activating the prepared ops/github-main-protection.json policy. See GLOBAL-SECURITY-BASELINE.md. No purchase or visibility change was made.
