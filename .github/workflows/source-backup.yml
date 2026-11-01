@@ -33,7 +33,7 @@ jobs:
             --header 'Content-Type: application/octet-stream' \
             --data-binary @hillstreet-source.bundle \
             https://ops.hillstreet.space/source-backup
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: hillstreet-source-${{ github.run_id }}
           path: |
