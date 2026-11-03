@@ -22,22 +22,28 @@ The user authorized applying a consistent baseline across owned Cloudflare domai
 
 HillStreet currently meets its applicable domain/Worker baseline, including validated DNSSEC, edge HSTS, private R2 storage, scoped WAF, tested Android inspection pilot, backup checks and source recovery. This does not install or enable every Cloudflare product; enable D1, KV, queues, Vectorize or paid services only when an application actually needs them. Never copy database keys, Sentry DSNs, Worker bearer tokens, Access audiences or DNSSEC digests between projects.
 
-## GitHub protection blocker and prepared policy
+## GitHub branch protection policy
 
-The hillstreet-ph organization reports the Free plan. The private hillstreet repository reports main protected=false. The branch-protection read endpoint returns HTTP 403 with: "Upgrade to GitHub Pro or make this repository public to enable this feature."
+The hillstreet-ph organization reports the Free plan, and the hillstreet repository is public, so protected branches are available without a billing change. Protection is applied and read back from `main`:
 
-For this organization-owned private repository, GitHub Team or Enterprise is the supported route. No billing change, repository visibility change, token replacement or alternate identity was used.
+| Setting | Live value |
+| --- | --- |
+| Required status check | `check` (the Validate website job) with strict up-to-date |
+| Restrict pushes that update | administrators enabled |
+| Linear history | required |
+| Force pushes / deletions | disabled |
+| Conversation resolution | required |
+| Approving reviews | zero |
+| Auto-merge | squash merge, enabled per pull request |
 
-Prepared payload: ops/github-main-protection.json. It requires PRs, up-to-date check and CodeQL results, resolved conversations and linear history; disables force pushes/deletion; and enforces restrictions for administrators. Approval count is zero because the organization currently reports one occupied seat; this avoids requiring an independent reviewer who has not been added. Raise it to one after a second eligible reviewer joins. This is not independent review enforcement.
+`ops/github-main-protection.json` is the payload that produced this state. The classic branch-protection endpoint rejects `required_status_checks.checks` for this repository and accepts `contexts`, so the file uses `contexts: ["check"]`.
 
-After an owner upgrades the organization and confirms the connected app has repository Administration write permission, inspect current protection first and apply the reviewed payload:
+CodeQL and the third-party review bots are deliberately not required checks. On this plan CodeQL posts `Analyze (actions)`, `Analyze (javascript-typescript)` and a `CodeQL (skipping)` check; making them required would block every merge without adding a gate that can actually pass. Zero approving reviews is not independent review enforcement, because the organization currently reports one occupied seat. Raise `required_approving_review_count` to one as soon as a second eligible reviewer joins, then re-read the protection to confirm.
 
 ```bash
-gh api --method PUT repos/hillstreet-ph/hillstreet/branches/main/protection --input ops/github-main-protection.json
 gh api repos/hillstreet-ph/hillstreet/branches/main/protection
+gh api --method PUT repos/hillstreet-ph/hillstreet/branches/main/protection --input ops/github-main-protection.json
 ```
-
-This command is a future activation procedure, not evidence protection is enabled. Do not apply after a denial or entitlement failure without resolving that prerequisite. Existing Pages build tests remain active but do not provide GitHub protected-branch enforcement.
 
 Sources:
 - https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches

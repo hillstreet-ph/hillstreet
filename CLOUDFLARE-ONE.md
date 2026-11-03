@@ -42,7 +42,7 @@ The Redmi A5 running Android 15 is enrolled and reports MASQUE registrations. It
 
 All 13 tests and production build passed again. The production Pages deployment b5a23ba7-7ab5-41ba-895c-7d87e364e5ba at commit c3983a89ecbdaf330f8148df9322eecb2dfe8947 succeeded. Public home/privacy returned 200, www preserved path/query in its 301 redirect, secret-path probes returned 403 and unauthenticated operations returned 403. Authenticated operations health returned 200 with site 200 and contact validation 400. Website edge certificate packs are active; SSL mode is strict. No open PRs existed before this documentation change.
 
-Google Workspace Admin/email delivery remain deferred. Registrar DNSSEC and previously denied GitHub branch protection remain pending. Do not represent this as 100% security.
+Google Workspace Admin/email delivery remain deferred. Registrar DNSSEC is active and authenticated (see DOMAIN-SECURITY.md). GitHub branch protection, previously denied with HTTP 403 while the repository was private, is applied and read back as of 2026-11-04 (see OPERATIONS.md). Do not represent this as 100% security.
 
 ## References
 
