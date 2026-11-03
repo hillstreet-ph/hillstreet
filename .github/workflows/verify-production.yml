@@ -1,0 +1,34 @@
+name: Verify production deployment
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verify-production
+  cancel-in-progress: false
+jobs:
+  verify:
+    name: Probe the live website
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # Cloudflare Pages builds main asynchronously, so the probe waits for the deployment
+      # that carries this commit before it asserts the routes.
+      - name: Verify every public route, header and endpoint
+        run: node scripts/verify-live.mjs --base https://hillstreet.pages.dev
+      - name: Record the result in the run summary
+        when: always()
+        run: |
+          {
+            echo "## Production verification"
+            echo "- commit: ${GITHUB_SHA}"
+            echo "- checked: https://hillstreet.pages.dev (Pages production alias)"
+            echo "- hillstreet.space is verified by the hillstreet-ops Worker health cron; Free-plan Bot Fight Mode challenges runner traffic to that zone."
+          } >> "$GITHUB_STEP_SUMMARY"
