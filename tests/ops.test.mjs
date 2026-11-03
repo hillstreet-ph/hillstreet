@@ -47,11 +47,11 @@ test('source recovery upload requires a matching checksum',async()=>{
 const digestOf=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',value))].map(x=>x.toString(16).padStart(2,'0')).join('');
 const fakeStore=()=>{const objects=new Map();const uploads=[];const sizeOf=v=>v instanceof Uint8Array?v.byteLength:String(v).length;
   const store={objects,uploads,corruptSize:false,
-    seed:(k,v,uploadedAt)=>objects.set(k,{value:v,uploadedAt:uploadedAt||new Date()}),
+    seed:(k,v,uploaded)=>objects.set(k,{value:v,uploaded:uploaded||new Date()}),
     put:async(k,v)=>{store.seed(k,v);return {size:sizeOf(v)};},
     get:async k=>objects.has(k)?{size:sizeOf(objects.get(k).value),text:async()=>{const v=objects.get(k).value;return typeof v==='string'?v:new TextDecoder().decode(v);}}:null,
     delete:async k=>{const keys=[].concat(k);if(!keys.length||keys.length>1000)throw new Error('delete: The number of keys in the request must be between 1 and 1000 inclusive. (10027)');for(const key of keys)objects.delete(key);},
-    list:async({prefix=''}={})=>({objects:[...objects].filter(([key])=>key.startsWith(prefix)).map(([key,record])=>({key,size:sizeOf(record.value),uploadedAt:record.uploadedAt})),truncated:false}),
+    list:async({prefix=''}={})=>({objects:[...objects].filter(([key])=>key.startsWith(prefix)).map(([key,record])=>({key,size:sizeOf(record.value),uploaded:record.uploaded})),truncated:false}),
     createMultipartUpload:async key=>{const upload={key,parts:new Map(),aborted:false,completed:false};uploads.push(upload);
       return {uploadPart:async(number,value)=>{upload.parts.set(number,value.slice(0));return {partNumber:number,etag:`${number}-etag`};},
         abort:async()=>{upload.aborted=true;},
@@ -105,14 +105,17 @@ test('source sync keeps the newest bundles and prunes the rest',async()=>{
   const original=globalThis.fetch;const bundle=new TextEncoder().encode('fresh git recovery bundle');const sha256=await digestOf(bundle);
   globalThis.fetch=releaseFetch({bundle,sha256});
   const store=fakeStore();const old=day=>new Date(Date.UTC(2026,9,day));
-  store.seed('source/aaaa111122223333.bundle','old one',old(1));
-  store.seed('source/bbbb111122223333.bundle','old two',old(2));
-  store.seed('source/cccc111122223333.bundle','old three',old(3));
-  store.seed('source/dddd111122223333.bundle','old four',old(4));
+  // Keys sort oldest-first while uploads sort newest-first, so a comparator that reads the wrong
+  // R2Object field prunes the newest mirror instead of the stale one and this assertion fails.
+  store.seed('source/zzzz111122223333.bundle','oldest',old(1));
+  store.seed('source/yyyy111122223333.bundle','older two',old(2));
+  store.seed('source/xxxx111122223333.bundle','older three',old(3));
+  store.seed('source/wwww111122223333.bundle','previous',old(4));
   try{
     const result=await sourceSync({BACKUPS:store});
-    assert.deepEqual(result.pruned.sort(),['source/aaaa111122223333.bundle','source/bbbb111122223333.bundle']);
-    assert.ok(store.objects.has('source/cccc111122223333.bundle'));
+    assert.deepEqual(result.pruned.sort(),['source/yyyy111122223333.bundle','source/zzzz111122223333.bundle']);
+    assert.ok(store.objects.has('source/xxxx111122223333.bundle'));
+    assert.ok(store.objects.has('source/wwww111122223333.bundle'));
     assert.ok(store.objects.has(`source/${sha256.slice(0,16)}.bundle`));
   }
   finally{globalThis.fetch=original;}

@@ -19,6 +19,11 @@ jobs:
       - name: Create and verify full Git recovery bundle
         run: |
           set -euo pipefail
+          # The recovery tags this workflow generates are artifacts, not history. Because a bundle
+          # carries every ref it is given, leaving them in would make the digest change each week even
+          # when no commit changed, and a restore would drag burned tag names back into the repository.
+          git for-each-ref --format='%(refname)' 'refs/tags/source-recovery*' 'refs/remotes/origin/tags/source-recovery*' |
+            xargs -r -n 50 git update-ref -d
           git bundle create hillstreet-source.bundle --all
           git bundle verify hillstreet-source.bundle
           sha256sum hillstreet-source.bundle > hillstreet-source.sha256
@@ -41,11 +46,21 @@ jobs:
           tag="source-recovery-$(date -u +%Y%m%dT%H%M%SZ)"
           title="HillStreet source recovery archive $tag"
           notes="Full git bundle of the repository. Commit ${GITHUB_SHA} on ${GITHUB_REF_NAME}. SHA-256: $(cut -d ' ' -f 1 hillstreet-source.sha256)"
-          newest=$(gh api "$api/releases?per_page=100" --jq '[.[] | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | (first // "")')
-          if [ -n "$newest" ] && [ "$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.bundle") | .digest] | first // ""')" = "$digest" ]; then
-            echo "Release $newest already carries this bundle ($digest); publishing nothing new."
-            echo "SOURCE_RECOVERY_TAG=$newest" >> "$GITHUB_ENV"
-            exit 0
+          newest=$(gh api "$api/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | (first // "")')
+          checksum="sha256:$(sha256sum hillstreet-source.sha256 | cut -d ' ' -f 1)"
+          if [ -n "$newest" ]; then
+            # Both assets have to agree before skipping. gh uploads them one at a time, so an
+            # interrupted run can leave a release holding the bundle but no checksum file, and the
+            # Worker cannot mirror a bundle it cannot verify. Skipping on the bundle alone would
+            # strand that half-published release forever, because the next weekly run would skip too.
+            published_bundle=$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.bundle") | .digest] | first // ""')
+            published_checksum=$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.sha256") | .digest] | first // ""')
+            if [ "$published_bundle" = "$digest" ] && [ "$published_checksum" = "$checksum" ]; then
+              echo "Release $newest already carries this bundle and its checksum ($digest); publishing nothing new."
+              echo "SOURCE_RECOVERY_TAG=$newest" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Release $newest carries bundle=$published_bundle checksum=$published_checksum, which is not this archive; publishing a fresh release."
           fi
           gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
           echo "Published recovery release $tag."
@@ -53,7 +68,7 @@ jobs:
           # Two dated releases stay public: the newest one the Worker mirrors and the one before it,
           # so a bundle that fails verification still has an immediate predecessor to fall back to.
           # Private R2 keeps three mirrors of its own, so the public window is only ever a pointer.
-          gh api "$api/releases?per_page=100" --jq '[.[] | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | .[2:] | .[]' |
+          gh api "$api/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | .[2:] | .[]' |
             while read -r retired; do
               gh release delete "$retired" --yes --cleanup-tag
               echo "Retired recovery release $retired."
