@@ -24,7 +24,7 @@ jobs:
       - name: Verify every public route, header and endpoint
         run: node scripts/verify-live.mjs --base https://hillstreet.pages.dev
       - name: Record the result in the run summary
-        when: always()
+        if: always()
         run: |
           {
             echo "## Production verification"
