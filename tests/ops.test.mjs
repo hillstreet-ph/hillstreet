@@ -153,6 +153,23 @@ test('source sync refuses a checksum file that is not a SHA-256 digest',async()=
   try{await assert.rejects(sourceSync({BACKUPS:fakeStore()}),/SHA-256 digest/);}
   finally{globalThis.fetch=original;}
 });
+test('source sync defers while the archive workflow republishes the release',async()=>{
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>new Response('Not Found',{status:404});
+  const store=fakeStore();
+  try{
+    const result=await sourceSync({BACKUPS:store});
+    assert.equal(result.ok,true);assert.equal(result.deferred,true);
+    assert.equal(store.objects.size,0);assert.equal(store.uploads.length,0);
+  }
+  finally{globalThis.fetch=original;}
+});
+test('source sync reports a checksum download that fails for a reason other than a missing bundle',async()=>{
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>new Response('rate limited',{status:403});
+  try{await assert.rejects(sourceSync({BACKUPS:fakeStore()}),/checksum download failed: HTTP 403/);}
+  finally{globalThis.fetch=original;}
+});
 test('the source cron routes to the release mirror',async()=>{
   const original=globalThis.fetch;const urls=[];
   globalThis.fetch=async url=>{urls.push(String(url));return String(url).includes('/envelope/')?new Response('{}'):new Response('<!doctype html><title>Just a moment</title>');};

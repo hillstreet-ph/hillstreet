@@ -22,12 +22,6 @@ async function readCapped(response, limit) {
   for (const part of chunks) { bytes.set(part, offset); offset += part.length; }
   return bytes;
 }
-async function fetchCapped(url, limit) {
-  const r = await fetch(url, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(60000) });
-  if (!r.ok) throw new Error(`Source download failed: HTTP ${r.status}`);
-  return readCapped(r, limit);
-}
-
 // The published bundle is larger than a Worker isolate can hold in memory, so the mirror
 // streams it straight into an R2 multipart upload while hashing each chunk as it passes.
 async function mirrorBundle(env, url, key, expected) {
@@ -101,7 +95,13 @@ async function sentry(env, type, payload) {
 }
 
 export async function sourceSync(env) {
-  const published = await fetchCapped(`${SOURCE_RELEASE}/hillstreet-source.sha256`, 1024);
+  // The archive workflow deletes and recreates the rolling release, so the published bundle is
+  // briefly absent. A missing checksum is a deferral, not a failure, otherwise every publish
+  // window would raise a monitoring alert for a job that simply has nothing new to mirror.
+  const probe = await fetch(`${SOURCE_RELEASE}/hillstreet-source.sha256`, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(60000) });
+  if (probe.status === 404) return { ok:true, deferred:true, reason:'No published recovery bundle yet' };
+  if (!probe.ok) throw new Error(`Source checksum download failed: HTTP ${probe.status}`);
+  const published = await readCapped(probe, 1024);
   const expected = new TextDecoder().decode(published).trim().split(/\s+/)[0] || '';
   if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error('Published source checksum is not a SHA-256 digest');
   const state = await env.BACKUPS.get('operations/latest-source.json');
