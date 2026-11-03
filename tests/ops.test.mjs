@@ -45,8 +45,22 @@ test('source recovery upload requires a matching checksum',async()=>{
   assert.equal((await worker.fetch(req(hash),{...env,BACKUPS})).status,201);assert.equal(written,true);
 });
 const digestOf=async value=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',value))].map(x=>x.toString(16).padStart(2,'0')).join('');
-const fakeStore=()=>{const objects=new Map();const size=v=>v instanceof Uint8Array?v.byteLength:String(v).length;
-  return {objects,put:async(k,v)=>{objects.set(k,v);return {size:size(v)};},get:async k=>objects.has(k)?{size:size(objects.get(k)),text:async()=>typeof objects.get(k)==='string'?objects.get(k):new TextDecoder().decode(objects.get(k))}:null};};
+const fakeStore=()=>{const objects=new Map();const uploads=[];const sizeOf=v=>v instanceof Uint8Array?v.byteLength:String(v).length;
+  const store={objects,uploads,corruptSize:false,
+    seed:(k,v,uploadedAt)=>objects.set(k,{value:v,uploadedAt:uploadedAt||new Date()}),
+    put:async(k,v)=>{store.seed(k,v);return {size:sizeOf(v)};},
+    get:async k=>objects.has(k)?{size:sizeOf(objects.get(k).value),text:async()=>{const v=objects.get(k).value;return typeof v==='string'?v:new TextDecoder().decode(v);}}:null,
+    delete:async k=>{for(const key of [].concat(k))objects.delete(key);},
+    list:async({prefix=''}={})=>({objects:[...objects].filter(([key])=>key.startsWith(prefix)).map(([key,record])=>({key,size:sizeOf(record.value),uploadedAt:record.uploadedAt})),truncated:false}),
+    createMultipartUpload:async key=>{const upload={key,parts:new Map(),aborted:false,completed:false};uploads.push(upload);
+      return {uploadPart:async(number,value)=>{upload.parts.set(number,value.slice(0));return {partNumber:number,etag:`${number}-etag`};},
+        abort:async()=>{upload.aborted=true;},
+        complete:async parts=>{upload.completed=true;const chunks=parts.map(part=>upload.parts.get(part.partNumber));
+          const total=chunks.reduce((sum,chunk)=>sum+chunk.length,0);const bytes=new Uint8Array(total);let offset=0;
+          for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}store.seed(key,bytes);
+          return {key,size:store.corruptSize?total-1:total};}};}};
+  return store;};
+const MiB=1024*1024;
 test('source sync mirrors the published release bundle into R2 and skips unchanged work',async()=>{
   const original=globalThis.fetch;const bundle=new TextEncoder().encode('synthetic git recovery bundle');const sha256=await digestOf(bundle);const downloads=[];
   globalThis.fetch=async url=>{const key=String(url);downloads.push(key);
@@ -63,11 +77,59 @@ test('source sync mirrors the published release bundle into R2 and skips unchang
   }
   finally{globalThis.fetch=original;}
 });
+test('source sync streams a bundle larger than the isolate can hold in uniform parts',async()=>{
+  const original=globalThis.fetch;
+  const pattern=new Uint8Array(64*MiB);for(let i=0;i<pattern.length;i++)pattern[i]=i%251;
+  const bundle=pattern.subarray(0,17*MiB+300*1024);
+  const sha256=await digestOf(bundle);
+  globalThis.fetch=async url=>{
+    if(String(url).endsWith('.sha256'))return new Response(`${sha256}  hillstreet-source.bundle\n`);
+    const stream=new ReadableStream({start(controller){let offset=0;
+      while(offset<bundle.length){const take=Math.min(offset===0?9*MiB:1*MiB+4096,bundle.length-offset);
+        controller.enqueue(bundle.subarray(offset,offset+take).slice(0));offset+=take;}
+      controller.close();}});
+    return new Response(stream);};
+  const store=fakeStore();
+  try{
+    const result=await sourceSync({BACKUPS:store});
+    assert.equal(result.bytes,bundle.byteLength);assert.equal(result.sha256,sha256);
+    const parts=[...store.uploads[0].parts.values()];
+    assert.deepEqual(parts.map(part=>part.length),[8*MiB,8*MiB,1*MiB+300*1024]);
+    assert.equal(store.objects.get(`source/${sha256.slice(0,16)}.bundle`).value.byteLength,bundle.byteLength);
+  }
+  finally{globalThis.fetch=original;}
+});
+test('source sync keeps the newest bundles and prunes the rest',async()=>{
+  const original=globalThis.fetch;const bundle=new TextEncoder().encode('fresh git recovery bundle');const sha256=await digestOf(bundle);
+  globalThis.fetch=async url=>String(url).endsWith('.sha256')?new Response(`${sha256}  hillstreet-source.bundle\n`):new Response(bundle);
+  const store=fakeStore();const old=day=>new Date(Date.UTC(2026,9,day));
+  store.seed('source/aaaa111122223333.bundle','old one',old(1));
+  store.seed('source/bbbb111122223333.bundle','old two',old(2));
+  store.seed('source/cccc111122223333.bundle','old three',old(3));
+  store.seed('source/dddd111122223333.bundle','old four',old(4));
+  try{
+    const result=await sourceSync({BACKUPS:store});
+    assert.deepEqual(result.pruned.sort(),['source/aaaa111122223333.bundle','source/bbbb111122223333.bundle']);
+    assert.ok(store.objects.has('source/cccc111122223333.bundle'));
+    assert.ok(store.objects.has(`source/${sha256.slice(0,16)}.bundle`));
+  }
+  finally{globalThis.fetch=original;}
+});
 test('source sync refuses a bundle that does not match the published checksum',async()=>{
   const original=globalThis.fetch;
   globalThis.fetch=async url=>String(url).endsWith('.sha256')?new Response(`${'0'.repeat(64)}  hillstreet-source.bundle\n`):new Response(new TextEncoder().encode('tampered bundle'));
   const store=fakeStore();
-  try{await assert.rejects(sourceSync({BACKUPS:store}),/checksum mismatch/);assert.equal(store.objects.size,0);}
+  try{
+    await assert.rejects(sourceSync({BACKUPS:store}),/checksum mismatch/);
+    assert.equal(store.objects.size,0);assert.equal(store.uploads[0].aborted,true);assert.equal(store.uploads[0].completed,false);
+  }
+  finally{globalThis.fetch=original;}
+});
+test('source sync deletes the mirror when the stored size does not match',async()=>{
+  const original=globalThis.fetch;const bundle=new TextEncoder().encode('git recovery bundle');const sha256=await digestOf(bundle);
+  globalThis.fetch=async url=>String(url).endsWith('.sha256')?new Response(`${sha256}  hillstreet-source.bundle\n`):new Response(bundle);
+  const store=fakeStore();store.corruptSize=true;
+  try{await assert.rejects(sourceSync({BACKUPS:store}),/read-back verification failed/);assert.equal(store.objects.size,0);}
   finally{globalThis.fetch=original;}
 });
 test('source sync refuses a checksum file that is not a SHA-256 digest',async()=>{

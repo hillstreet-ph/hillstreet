@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
 const TABLE = 'hillstreet_website_inquiries';
 const MONITOR = 'hillstreet-daily-backup';
 const response = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const digest = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', typeof value === 'string' ? new TextEncoder().encode(value) : value))].map(x => x.toString(16).padStart(2,'0')).join('');
 const SOURCE_RELEASE = 'https://github.com/hillstreet-ph/hillstreet/releases/download/source-recovery';
-const MAX_SOURCE_BYTES = 50 * 1024 * 1024;
+const SOURCE_PART_BYTES = 8 * 1024 * 1024;
+const MAX_SOURCE_BYTES = 4 * 1024 * 1024 * 1024;
+const KEEP_SOURCE_BUNDLES = 3;
 const SUBPAGES = ['/agency','/influencers','/cooperation'];
 async function readCapped(response, limit) {
   if (!response.body) return new Uint8Array(0);
@@ -25,6 +28,70 @@ async function fetchCapped(url, limit) {
   return readCapped(r, limit);
 }
 
+// The published bundle is larger than a Worker isolate can hold in memory, so the mirror
+// streams it straight into an R2 multipart upload while hashing each chunk as it passes.
+async function mirrorBundle(env, url, key, expected) {
+  const source = await fetch(url, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(600000) });
+  if (!source.ok || !source.body) throw new Error(`Source download failed: HTTP ${source.status}`);
+  const upload = await env.BACKUPS.createMultipartUpload(key, {
+    httpMetadata: { contentType: 'application/octet-stream' },
+    customMetadata: { sha256: expected, origin: 'github-release:source-recovery' },
+  });
+  const hash = createHash('sha256');
+  const reader = source.body.getReader();
+  const parts = [];
+  let part = new Uint8Array(SOURCE_PART_BYTES);
+  let filled = 0;
+  let total = 0;
+  let completed = false;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      total += value.length;
+      if (total > MAX_SOURCE_BYTES) throw new Error(`Source bundle exceeds ${Math.floor(MAX_SOURCE_BYTES / 1073741824)} GiB`);
+      hash.update(value);
+      let offset = 0;
+      while (offset < value.length) {
+        const take = Math.min(SOURCE_PART_BYTES - filled, value.length - offset);
+        part.set(value.subarray(offset, offset + take), filled);
+        filled += take;
+        offset += take;
+        if (filled === SOURCE_PART_BYTES) {
+          parts.push(await upload.uploadPart(parts.length + 1, part));
+          part = new Uint8Array(SOURCE_PART_BYTES);
+          filled = 0;
+        }
+      }
+    }
+    if (!total) throw new Error('Source bundle is empty');
+    if (filled) parts.push(await upload.uploadPart(parts.length + 1, part.subarray(0, filled)));
+    const sha256 = hash.digest('hex');
+    if (sha256 !== expected) throw new Error('Source bundle checksum mismatch');
+    const stored = await upload.complete(parts);
+    completed = true;
+    if (!stored || stored.size !== total) { await env.BACKUPS.delete(key); throw new Error('Source bundle read-back verification failed'); }
+    return total;
+  } catch (error) {
+    if (!completed) await upload.abort();
+    throw error;
+  }
+}
+
+async function pruneSourceBundles(env, keepKey) {
+  const bundles = [];
+  let cursor;
+  do {
+    const page = await env.BACKUPS.list({ prefix: 'source/', limit: 1000, cursor });
+    bundles.push(...page.objects);
+    cursor = page.truncated ? page.cursor : undefined;
+  } while (cursor);
+  const newest = bundles.sort((a, b) => b.uploadedAt - a.uploadedAt).slice(KEEP_SOURCE_BUNDLES);
+  const removed = newest.filter(object => object.key !== keepKey).map(object => object.key);
+  await env.BACKUPS.delete(removed);
+  return removed;
+}
+
 async function sentry(env, type, payload) {
   const dsn = new URL(env.SENTRY_DSN);
   const project = dsn.pathname.slice(1);
@@ -39,15 +106,10 @@ export async function sourceSync(env) {
   if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error('Published source checksum is not a SHA-256 digest');
   const state = await env.BACKUPS.get('operations/latest-source.json');
   if (state && JSON.parse(await state.text()).sha256 === expected) return { ok:true, unchanged:true, sha256:expected };
-  const bytes = await fetchCapped(`${SOURCE_RELEASE}/hillstreet-source.bundle`, MAX_SOURCE_BYTES);
-  if (!bytes.byteLength) throw new Error('Source bundle is empty');
-  const sha256 = await digest(bytes);
-  if (sha256 !== expected) throw new Error('Source bundle checksum mismatch');
-  const key = `source/${sha256.slice(0,16)}.bundle`;
-  await env.BACKUPS.put(key, bytes, { httpMetadata:{contentType:'application/octet-stream'}, customMetadata:{ sha256, bytes:String(bytes.byteLength), origin:'github-release:source-recovery' } });
-  const stored = await env.BACKUPS.get(key);
-  if (!stored || stored.size !== bytes.byteLength) throw new Error('Source bundle read-back verification failed');
-  const result = { ok:true, key, sha256, bytes:bytes.byteLength, synced_at:new Date().toISOString() };
+  const key = `source/${expected.slice(0,16)}.bundle`;
+  const mirrored = await mirrorBundle(env, `${SOURCE_RELEASE}/hillstreet-source.bundle`, key, expected);
+  const pruned = await pruneSourceBundles(env, key);
+  const result = { ok:true, key, sha256:expected, bytes:mirrored, synced_at:new Date().toISOString(), pruned };
   await env.BACKUPS.put('operations/latest-source.json', JSON.stringify(result), { httpMetadata:{contentType:'application/json'} });
   return result;
 }
