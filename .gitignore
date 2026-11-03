@@ -1,6 +1,7 @@
 node_modules/
 .wrangler/
 site/assets/website.js
+site/build-info.json
 .dev.vars
 .env
 .env.*

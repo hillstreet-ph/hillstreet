@@ -5,9 +5,6 @@
     "checks": [
       {
         "context": "check"
-      },
-      {
-        "context": "CodeQL"
       }
     ]
   },

@@ -31,6 +31,9 @@ for (const slug of agencySlugs) {
     }
   }
 }
+// Cloudflare Pages stamps the commit that triggered the build, so the live deployment can
+// be matched to the exact merged commit by scripts/verify-live.mjs.
+await writeFile('site/build-info.json', JSON.stringify({ project: 'hillstreet', commit: process.env.CF_PAGES_COMMIT_SHA || 'local', built_at: new Date().toISOString() }) + '\n');
 const html = await readFile('site/index.html', 'utf8');
 if (!html.includes('/assets/website.js')) throw new Error('Website integration entry is missing');
 const hashes = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]

@@ -7,7 +7,10 @@ permissions:
   contents: read
 jobs:
   archive:
+    name: Bundle, publish and mirror the Git history
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -15,24 +18,41 @@ jobs:
           persist-credentials: false
       - name: Create and verify full Git recovery bundle
         run: |
+          set -euo pipefail
           git bundle create hillstreet-source.bundle --all
           git bundle verify hillstreet-source.bundle
           sha256sum hillstreet-source.bundle > hillstreet-source.sha256
-      - name: Copy source archive to private offsite R2 storage
+      # GitHub Actions runners cannot reach hillstreet.space: the zone is on the Cloudflare
+      # Free plan, whose Bot Fight Mode challenges every runner request and cannot be skipped
+      # by a WAF rule. The bundle is published to a rolling public release instead, and the
+      # hillstreet-ops Worker pulls it into private R2 storage from inside Cloudflare.
+      - name: Publish the bundle to the rolling source-recovery release
         env:
-          OPS_CLIENT_ID: ${{ secrets.HILLSTREET_OPS_CLIENT_ID }}
-          OPS_CLIENT_SECRET: ${{ secrets.HILLSTREET_OPS_CLIENT_SECRET }}
-          OPS_TOKEN: ${{ secrets.HILLSTREET_OPS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          archive_hash=$(sha256sum hillstreet-source.bundle | cut -d ' ' -f 1)
-          curl --fail-with-body --retry 2 --request POST \
-            --header "CF-Access-Client-Id: $OPS_CLIENT_ID" \
-            --header "CF-Access-Client-Secret: $OPS_CLIENT_SECRET" \
-            --header "Authorization: Bearer $OPS_TOKEN" \
-            --header "X-Backup-Sha256: $archive_hash" \
-            --header 'Content-Type: application/octet-stream' \
-            --data-binary @hillstreet-source.bundle \
-            https://ops.hillstreet.space/source-backup
+          set -euo pipefail
+          tag=source-recovery
+          title="HillStreet source recovery archive"
+          notes="Full git bundle of the repository. Commit ${GITHUB_SHA} on ${GITHUB_REF_NAME}. SHA-256: $(cut -d ' ' -f 1 hillstreet-source.sha256)"
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" hillstreet-source.bundle hillstreet-source.sha256 --clobber
+            gh release edit "$tag" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
+          fi
+      - name: Confirm the Worker can reach both release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          base="https://github.com/hillstreet-ph/hillstreet/releases/download/source-recovery"
+          for asset in hillstreet-source.sha256 hillstreet-source.bundle; do
+            code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 120 --location "$base/$asset")
+            echo "$asset responded HTTP $code"
+            test "$code" = 200
+          done
+          downloaded=$(curl --silent --show-error --location --max-time 120 "$base/hillstreet-source.sha256" | cut -d ' ' -f 1)
+          test "$downloaded" = "$(cut -d ' ' -f 1 hillstreet-source.sha256)"
       - uses: actions/upload-artifact@v7
         with:
           name: hillstreet-source-${{ github.run_id }}
