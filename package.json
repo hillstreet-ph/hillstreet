@@ -7,7 +7,7 @@
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs"
   },
-  "dependencies": { "@sentry/browser": "11.9.0" },
+  "dependencies": { "@sentry/browser": "11.10.0" },
   "devDependencies": { "esbuild": "0.28.2" },
   "engines": { "node": ">=22" }
 }
