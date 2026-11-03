@@ -3,7 +3,8 @@ const TABLE = 'hillstreet_website_inquiries';
 const MONITOR = 'hillstreet-daily-backup';
 const response = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const digest = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', typeof value === 'string' ? new TextEncoder().encode(value) : value))].map(x => x.toString(16).padStart(2,'0')).join('');
-const SOURCE_RELEASE = 'https://github.com/hillstreet-ph/hillstreet/releases/download/source-recovery';
+const SOURCE_REPOSITORY = 'https://github.com/hillstreet-ph/hillstreet';
+const SOURCE_TAG_PREFIX = 'source-recovery-';
 const SOURCE_PART_BYTES = 8 * 1024 * 1024;
 const MAX_SOURCE_BYTES = 4 * 1024 * 1024 * 1024;
 const KEEP_SOURCE_BUNDLES = 3;
@@ -24,12 +25,12 @@ async function readCapped(response, limit) {
 }
 // The published bundle is larger than a Worker isolate can hold in memory, so the mirror
 // streams it straight into an R2 multipart upload while hashing each chunk as it passes.
-async function mirrorBundle(env, url, key, expected) {
+async function mirrorBundle(env, url, key, expected, tag) {
   const source = await fetch(url, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(600000) });
   if (!source.ok || !source.body) throw new Error(`Source download failed: HTTP ${source.status}`);
   const upload = await env.BACKUPS.createMultipartUpload(key, {
     httpMetadata: { contentType: 'application/octet-stream' },
-    customMetadata: { sha256: expected, origin: 'github-release:source-recovery' },
+    customMetadata: { sha256: expected, origin: `github-release:${tag}` },
   });
   const hash = createHash('sha256');
   const reader = source.body.getReader();
@@ -94,22 +95,41 @@ async function sentry(env, type, payload) {
   if (!r.ok) throw new Error('Monitoring check-in failed');
 }
 
+// GitHub marks every release in this organisation immutable when it is created, which freezes its
+// assets, and a deleted release burns its tag name forever. The archive workflow therefore publishes
+// a fresh dated release each week instead of editing one, so this feed read is the only discovery
+// step. Atom entries arrive newest first; sorting the tags keeps the mirror correct if that changes.
+async function newestSourceRelease() {
+  const feed = await fetch(`${SOURCE_REPOSITORY}/releases.atom`, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(60000) });
+  if (feed.status === 404) return null;
+  if (!feed.ok) throw new Error(`Source release feed download failed: HTTP ${feed.status}`);
+  const body = new TextDecoder().decode(await readCapped(feed, 262144));
+  const tags = [];
+  for (const match of body.matchAll(/\/releases\/tag\/([A-Za-z0-9._-]+)/g)) {
+    if (match[1].startsWith(SOURCE_TAG_PREFIX)) tags.push(match[1]);
+  }
+  return tags.sort()[tags.length - 1] || null;
+}
+
 export async function sourceSync(env) {
-  // The archive workflow deletes and recreates the rolling release, so the published bundle is
-  // briefly absent. A missing checksum is a deferral, not a failure, otherwise every publish
-  // window would raise a monitoring alert for a job that simply has nothing new to mirror.
-  const probe = await fetch(`${SOURCE_RELEASE}/hillstreet-source.sha256`, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(60000) });
-  if (probe.status === 404) return { ok:true, deferred:true, reason:'No published recovery bundle yet' };
+  const tag = await newestSourceRelease();
+  if (!tag) return { ok:true, deferred:true, reason:'No published recovery release yet' };
+  const download = `${SOURCE_REPOSITORY}/releases/download/${tag}`;
+  // The archive workflow creates a release and uploads its assets together, but a release with no
+  // assets is reachable. A missing checksum is a deferral, not a failure, so the publish window
+  // never raises a monitoring alert for a job that simply has nothing new to mirror.
+  const probe = await fetch(`${download}/hillstreet-source.sha256`, { headers: { 'User-Agent': 'hillstreet-ops-source-sync' }, signal: AbortSignal.timeout(60000) });
+  if (probe.status === 404) return { ok:true, deferred:true, reason:`Recovery release ${tag} carries no checksum asset yet` };
   if (!probe.ok) throw new Error(`Source checksum download failed: HTTP ${probe.status}`);
   const published = await readCapped(probe, 1024);
   const expected = new TextDecoder().decode(published).trim().split(/\s+/)[0] || '';
   if (!/^[0-9a-f]{64}$/.test(expected)) throw new Error('Published source checksum is not a SHA-256 digest');
   const state = await env.BACKUPS.get('operations/latest-source.json');
-  if (state && JSON.parse(await state.text()).sha256 === expected) return { ok:true, unchanged:true, sha256:expected };
+  if (state && JSON.parse(await state.text()).sha256 === expected) return { ok:true, unchanged:true, sha256:expected, tag };
   const key = `source/${expected.slice(0,16)}.bundle`;
-  const mirrored = await mirrorBundle(env, `${SOURCE_RELEASE}/hillstreet-source.bundle`, key, expected);
+  const mirrored = await mirrorBundle(env, `${download}/hillstreet-source.bundle`, key, expected, tag);
   const pruned = await pruneSourceBundles(env, key);
-  const result = { ok:true, key, sha256:expected, bytes:mirrored, synced_at:new Date().toISOString(), pruned };
+  const result = { ok:true, tag, key, sha256:expected, bytes:mirrored, synced_at:new Date().toISOString(), pruned };
   await env.BACKUPS.put('operations/latest-source.json', JSON.stringify(result), { httpMetadata:{contentType:'application/json'} });
   return result;
 }

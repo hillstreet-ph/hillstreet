@@ -24,40 +24,46 @@ jobs:
           sha256sum hillstreet-source.bundle > hillstreet-source.sha256
       # GitHub Actions runners cannot reach hillstreet.space: the zone is on the Cloudflare
       # Free plan, whose Bot Fight Mode challenges every runner request and cannot be skipped
-      # by a WAF rule. The bundle is published to a rolling public release instead, and the
-      # hillstreet-ops Worker pulls it into private R2 storage from inside Cloudflare.
-      - name: Publish the bundle to the rolling source-recovery release
+      # by a WAF rule. The bundle is published to a public release instead, and the hillstreet-ops
+      # Worker pulls it into private R2 storage from inside Cloudflare.
+      # This organization enforces immutable releases. GitHub marks each release immutable as it is
+      # created, which freezes its assets, and there is no per-release route to lift that: an asset
+      # replacement fails with HTTP 422, and although deleting the whole release is allowed, a tag
+      # used by an immutable release is burned, so recreating it under the same name is rejected.
+      # Every run therefore publishes a new dated release and prunes the oldest ones.
+      - name: Publish the bundle to a dated source recovery release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=source-recovery
           api="repos/${{ github.repository }}"
           digest="sha256:$(cut -d ' ' -f 1 hillstreet-source.sha256)"
-          title="HillStreet source recovery archive"
+          tag="source-recovery-$(date -u +%Y%m%dT%H%M%SZ)"
+          title="HillStreet source recovery archive $tag"
           notes="Full git bundle of the repository. Commit ${GITHUB_SHA} on ${GITHUB_REF_NAME}. SHA-256: $(cut -d ' ' -f 1 hillstreet-source.sha256)"
-          if id=$(gh api "$api/releases/tags/$tag" --jq .id 2>/dev/null); then
-            published=$(gh api "$api/releases/$id/assets?per_page=100" --jq '.[] | select(.name == "hillstreet-source.bundle") | .digest')
-            if [ "$published" = "$digest" ]; then
-              echo "Release $tag already carries this bundle ($digest); publishing nothing."
-              exit 0
-            fi
-            # This organization enforces immutable releases, so a published release cannot be
-            # edited at all: gh release upload --clobber replaces an asset, which is an edit, and
-            # GitHub rejects it with HTTP 422. Deleting the whole release is still permitted, so the
-            # rolling pointer is removed and recreated with the new bundle instead of being patched.
-            gh release delete "$tag" --yes --cleanup-tag
-            echo "Removed the previous $tag release so the new bundle can take its place."
-          else
-            echo "No $tag release exists yet; creating it."
+          newest=$(gh api "$api/releases?per_page=100" --jq '[.[] | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | (first // "")')
+          if [ -n "$newest" ] && [ "$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.bundle") | .digest] | first // ""')" = "$digest" ]; then
+            echo "Release $newest already carries this bundle ($digest); publishing nothing new."
+            echo "SOURCE_RECOVERY_TAG=$newest" >> "$GITHUB_ENV"
+            exit 0
           fi
           gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
+          echo "Published recovery release $tag."
+          echo "SOURCE_RECOVERY_TAG=$tag" >> "$GITHUB_ENV"
+          # Two dated releases stay public: the newest one the Worker mirrors and the one before it,
+          # so a bundle that fails verification still has an immediate predecessor to fall back to.
+          # Private R2 keeps three mirrors of its own, so the public window is only ever a pointer.
+          gh api "$api/releases?per_page=100" --jq '[.[] | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | .[2:] | .[]' |
+            while read -r retired; do
+              gh release delete "$retired" --yes --cleanup-tag
+              echo "Retired recovery release $retired."
+            done
       - name: Confirm the Worker can reach both release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          base="https://github.com/hillstreet-ph/hillstreet/releases/download/source-recovery"
+          base="https://github.com/hillstreet-ph/hillstreet/releases/download/$SOURCE_RECOVERY_TAG"
           for asset in hillstreet-source.sha256 hillstreet-source.bundle; do
             code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 120 --location "$base/$asset")
             echo "$asset responded HTTP $code"
