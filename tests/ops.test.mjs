@@ -50,7 +50,7 @@ const fakeStore=()=>{const objects=new Map();const uploads=[];const sizeOf=v=>v 
     seed:(k,v,uploadedAt)=>objects.set(k,{value:v,uploadedAt:uploadedAt||new Date()}),
     put:async(k,v)=>{store.seed(k,v);return {size:sizeOf(v)};},
     get:async k=>objects.has(k)?{size:sizeOf(objects.get(k).value),text:async()=>{const v=objects.get(k).value;return typeof v==='string'?v:new TextDecoder().decode(v);}}:null,
-    delete:async k=>{for(const key of [].concat(k))objects.delete(key);},
+    delete:async k=>{const keys=[].concat(k);if(!keys.length||keys.length>1000)throw new Error('delete: The number of keys in the request must be between 1 and 1000 inclusive. (10027)');for(const key of keys)objects.delete(key);},
     list:async({prefix=''}={})=>({objects:[...objects].filter(([key])=>key.startsWith(prefix)).map(([key,record])=>({key,size:sizeOf(record.value),uploadedAt:record.uploadedAt})),truncated:false}),
     createMultipartUpload:async key=>{const upload={key,parts:new Map(),aborted:false,completed:false};uploads.push(upload);
       return {uploadPart:async(number,value)=>{upload.parts.set(number,value.slice(0));return {partNumber:number,etag:`${number}-etag`};},
@@ -111,6 +111,21 @@ test('source sync keeps the newest bundles and prunes the rest',async()=>{
     const result=await sourceSync({BACKUPS:store});
     assert.deepEqual(result.pruned.sort(),['source/aaaa111122223333.bundle','source/bbbb111122223333.bundle']);
     assert.ok(store.objects.has('source/cccc111122223333.bundle'));
+    assert.ok(store.objects.has(`source/${sha256.slice(0,16)}.bundle`));
+  }
+  finally{globalThis.fetch=original;}
+});
+test('source sync skips pruning when the bundle set is still within retention',async()=>{
+  const original=globalThis.fetch;const bundle=new TextEncoder().encode('only bundle in the store');const sha256=await digestOf(bundle);
+  globalThis.fetch=async url=>String(url).endsWith('.sha256')?new Response(`${sha256}  hillstreet-source.bundle\n`):new Response(bundle);
+  const store=fakeStore();const old=day=>new Date(Date.UTC(2026,9,day));
+  store.seed('source/aaaa111122223333.bundle','old one',old(1));
+  store.seed('source/bbbb111122223333.bundle','old two',old(2));
+  try{
+    const result=await sourceSync({BACKUPS:store});
+    assert.equal(result.ok,true);assert.deepEqual(result.pruned,[]);
+    assert.ok(store.objects.has('operations/latest-source.json'));
+    assert.ok(store.objects.has('source/aaaa111122223333.bundle'));
     assert.ok(store.objects.has(`source/${sha256.slice(0,16)}.bundle`));
   }
   finally{globalThis.fetch=original;}

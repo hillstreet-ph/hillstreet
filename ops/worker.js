@@ -88,7 +88,7 @@ async function pruneSourceBundles(env, keepKey) {
   } while (cursor);
   const newest = bundles.sort((a, b) => b.uploadedAt - a.uploadedAt).slice(KEEP_SOURCE_BUNDLES);
   const removed = newest.filter(object => object.key !== keepKey).map(object => object.key);
-  await env.BACKUPS.delete(removed);
+  if (removed.length) await env.BACKUPS.delete(removed);
   return removed;
 }
 

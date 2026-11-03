@@ -32,9 +32,25 @@ jobs:
         run: |
           set -euo pipefail
           tag=source-recovery
+          api="repos/${{ github.repository }}"
+          digest="sha256:$(cut -d ' ' -f 1 hillstreet-source.sha256)"
           title="HillStreet source recovery archive"
           notes="Full git bundle of the repository. Commit ${GITHUB_SHA} on ${GITHUB_REF_NAME}. SHA-256: $(cut -d ' ' -f 1 hillstreet-source.sha256)"
-          if gh release view "$tag" > /dev/null 2>&1; then
+          if id=$(gh api "$api/releases/tags/$tag" --jq .id 2>/dev/null); then
+            current=$(gh api "$api/releases/$id/assets?per_page=100" --jq '.[] | select(.name == "hillstreet-source.bundle") | .digest')
+            if [ "$current" = "$digest" ]; then
+              echo "Release $tag already carries this bundle ($digest); replacing nothing."
+              exit 0
+            fi
+            # A rolling release must stay mutable, because replacing an asset means deleting it
+            # and an immutable release rejects the delete with HTTP 422. GitHub marks this release
+            # immutable on its own, so every run that has new content clears the flag first and
+            # refuses to continue if it cannot, rather than failing later inside --clobber.
+            if [ "$(gh api "$api/releases/$id" --jq .immutable)" = "true" ]; then
+              gh api -X POST "$api/releases/$id/unset_immutable" --jq .immutable | grep -q false
+              test "$(gh api "$api/releases/$id" --jq .immutable)" = "false"
+              echo "Cleared immutability on release $tag so its assets can be replaced."
+            fi
             gh release upload "$tag" hillstreet-source.bundle hillstreet-source.sha256 --clobber
             gh release edit "$tag" --title "$title" --notes "$notes"
           else
