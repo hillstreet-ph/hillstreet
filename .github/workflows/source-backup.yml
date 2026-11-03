@@ -37,8 +37,29 @@ jobs:
       # created, which freezes its assets, and there is no per-release route to lift that: an asset
       # replacement fails with HTTP 422, and although deleting the whole release is allowed, a tag
       # used by an immutable release is burned, so recreating it under the same name is rejected.
-      # Every run therefore publishes a new dated release and prunes the oldest ones.
+      # Every run on the default branch therefore publishes a new dated release and prunes the oldest
+      # ones. Runs from any other ref bundle and verify but publish nothing, so pre-merge testing of
+      # this workflow cannot displace main's archive in the Worker's mirror.
+      - name: Decide whether this run may publish a recovery release
+        id: publish_gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # A dated release stays public and burns its tag name, and the ops Worker mirrors whichever
+          # recovery tag sorts newest. A branch experiment whose tag happened to be later would
+          # therefore become the archive in private R2 while the real main bundle sat behind it, so
+          # only the default branch publishes. Branch runs still bundle and verify, which is how this
+          # workflow gets proven before it is merged.
+          default_branch=$(gh api "repos/${{ github.repository }}" --jq .default_branch)
+          if [ "$GITHUB_REF_NAME" = "$default_branch" ]; then
+            echo "may_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Run is on $GITHUB_REF_NAME, not $default_branch: bundling and verifying without publishing a release."
+            echo "may_publish=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Publish the bundle to a dated source recovery release
+        if: steps.publish_gate.outputs.may_publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -72,6 +93,7 @@ jobs:
       # can fail, and if cleanup only ran on the publish path those extras would stay public until some
       # future bundle differed from them.
       - name: Retire recovery releases older than the two newest
+        if: steps.publish_gate.outputs.may_publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -86,6 +108,7 @@ jobs:
               echo "Retired recovery release $retired."
             done
       - name: Confirm the Worker can reach both release assets
+        if: steps.publish_gate.outputs.may_publish == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
