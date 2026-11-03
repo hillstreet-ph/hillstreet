@@ -19,33 +19,76 @@ jobs:
       - name: Create and verify full Git recovery bundle
         run: |
           set -euo pipefail
+          # The recovery tags this workflow generates are artifacts, not history. Because a bundle
+          # carries every ref it is given, leaving them in would make the digest change each week even
+          # when no commit changed, and a restore would drag burned tag names back into the repository.
+          git for-each-ref --format='%(refname)' 'refs/tags/source-recovery*' 'refs/remotes/origin/tags/source-recovery*' |
+            xargs -r -n 50 git update-ref -d
           git bundle create hillstreet-source.bundle --all
           git bundle verify hillstreet-source.bundle
           sha256sum hillstreet-source.bundle > hillstreet-source.sha256
       # GitHub Actions runners cannot reach hillstreet.space: the zone is on the Cloudflare
       # Free plan, whose Bot Fight Mode challenges every runner request and cannot be skipped
-      # by a WAF rule. The bundle is published to a rolling public release instead, and the
-      # hillstreet-ops Worker pulls it into private R2 storage from inside Cloudflare.
-      - name: Publish the bundle to the rolling source-recovery release
+      # by a WAF rule. The bundle is published to a public release instead, and the hillstreet-ops
+      # Worker pulls it into private R2 storage from inside Cloudflare.
+      # This organization enforces immutable releases. GitHub marks each release immutable as it is
+      # created, which freezes its assets, and there is no per-release route to lift that: an asset
+      # replacement fails with HTTP 422, and although deleting the whole release is allowed, a tag
+      # used by an immutable release is burned, so recreating it under the same name is rejected.
+      # Every run therefore publishes a new dated release and prunes the oldest ones.
+      - name: Publish the bundle to a dated source recovery release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag=source-recovery
-          title="HillStreet source recovery archive"
+          api="repos/${{ github.repository }}"
+          digest="sha256:$(cut -d ' ' -f 1 hillstreet-source.sha256)"
+          tag="source-recovery-$(date -u +%Y%m%dT%H%M%SZ)"
+          title="HillStreet source recovery archive $tag"
           notes="Full git bundle of the repository. Commit ${GITHUB_SHA} on ${GITHUB_REF_NAME}. SHA-256: $(cut -d ' ' -f 1 hillstreet-source.sha256)"
-          if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" hillstreet-source.bundle hillstreet-source.sha256 --clobber
-            gh release edit "$tag" --title "$title" --notes "$notes"
-          else
-            gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
+          newest=$(gh api "$api/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | (first // "")')
+          checksum="sha256:$(sha256sum hillstreet-source.sha256 | cut -d ' ' -f 1)"
+          if [ -n "$newest" ]; then
+            # Both assets have to agree before skipping. gh uploads them one at a time, so an
+            # interrupted run can leave a release holding the bundle but no checksum file, and the
+            # Worker cannot mirror a bundle it cannot verify. Skipping on the bundle alone would
+            # strand that half-published release forever, because the next weekly run would skip too.
+            published_bundle=$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.bundle") | .digest] | first // ""')
+            published_checksum=$(gh api "$api/releases/tags/$newest" --jq '[.assets[] | select(.name == "hillstreet-source.sha256") | .digest] | first // ""')
+            if [ "$published_bundle" = "$digest" ] && [ "$published_checksum" = "$checksum" ]; then
+              echo "Release $newest already carries this bundle and its checksum ($digest); publishing nothing new."
+              echo "SOURCE_RECOVERY_TAG=$newest" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "Release $newest carries bundle=$published_bundle checksum=$published_checksum, which is not this archive; publishing a fresh release."
           fi
+          gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
+          echo "Published recovery release $tag."
+          echo "SOURCE_RECOVERY_TAG=$tag" >> "$GITHUB_ENV"
+      # Retention is its own step rather than the tail of the publish step, because the publish step
+      # exits early when the newest release already carries this archive. Deleting a burned-tag release
+      # can fail, and if cleanup only ran on the publish path those extras would stay public until some
+      # future bundle differed from them.
+      - name: Retire recovery releases older than the two newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="repos/${{ github.repository }}"
+          # Two dated releases stay public: the newest one the Worker mirrors and the one before it,
+          # so a bundle that fails verification still has an immediate predecessor to fall back to.
+          # Private R2 keeps three mirrors of its own, so the public window is only ever a pointer.
+          gh api "$api/releases?per_page=100" --jq '[.[] | select(.draft == false and .prerelease == false) | select(.tag_name | startswith("source-recovery-")) | .tag_name] | sort | reverse | .[2:] | .[]' |
+            while read -r retired; do
+              gh release delete "$retired" --yes --cleanup-tag
+              echo "Retired recovery release $retired."
+            done
       - name: Confirm the Worker can reach both release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          base="https://github.com/hillstreet-ph/hillstreet/releases/download/source-recovery"
+          base="https://github.com/hillstreet-ph/hillstreet/releases/download/$SOURCE_RECOVERY_TAG"
           for asset in hillstreet-source.sha256 hillstreet-source.bundle; do
             code=$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --max-time 120 --location "$base/$asset")
             echo "$asset responded HTTP $code"
