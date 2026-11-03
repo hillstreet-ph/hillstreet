@@ -65,6 +65,16 @@ jobs:
           gh release create "$tag" hillstreet-source.bundle hillstreet-source.sha256 --target "$GITHUB_SHA" --title "$title" --notes "$notes"
           echo "Published recovery release $tag."
           echo "SOURCE_RECOVERY_TAG=$tag" >> "$GITHUB_ENV"
+      # Retention is its own step rather than the tail of the publish step, because the publish step
+      # exits early when the newest release already carries this archive. Deleting a burned-tag release
+      # can fail, and if cleanup only ran on the publish path those extras would stay public until some
+      # future bundle differed from them.
+      - name: Retire recovery releases older than the two newest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          api="repos/${{ github.repository }}"
           # Two dated releases stay public: the newest one the Worker mirrors and the one before it,
           # so a bundle that fails verification still has an immediate predecessor to fall back to.
           # Private R2 keeps three mirrors of its own, so the public window is only ever a pointer.
