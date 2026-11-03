@@ -22,8 +22,10 @@ jobs:
           # The recovery tags this workflow generates are artifacts, not history. Because a bundle
           # carries every ref it is given, leaving them in would make the digest change each week even
           # when no commit changed, and a restore would drag burned tag names back into the repository.
+          # One refname per update-ref call: git reads a second argument as the expected object, so
+          # passing a batch makes it delete the first tag only if it matches the second tag's commit.
           git for-each-ref --format='%(refname)' 'refs/tags/source-recovery*' 'refs/remotes/origin/tags/source-recovery*' |
-            xargs -r -n 50 git update-ref -d
+            xargs -r -n 1 git update-ref -d
           git bundle create hillstreet-source.bundle --all
           git bundle verify hillstreet-source.bundle
           sha256sum hillstreet-source.bundle > hillstreet-source.sha256
