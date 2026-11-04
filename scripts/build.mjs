@@ -2,6 +2,7 @@ import { build } from 'esbuild';
 import { readFile, writeFile, access } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { navBlock } from '../src/site-nav.mjs';
+import { scriptElements } from '../src/html-scripts.mjs';
 await build({ entryPoints: ['src/website.js'], bundle: true, minify: true, format: 'iife', target: ['es2022'], outfile: 'site/assets/website.js', sourcemap: false });
 for (const path of ['site/index.html','site/assets/index-D4yBHoPu.js','site/assets/index-DwciAvas.css','site/images/business-meeting-proof.mp4']) await access(path);
 
@@ -12,7 +13,7 @@ for (const slug of agencySlugs) {
   const page = await readFile(path, 'utf8');
   if (page.includes('canva.site')) throw new Error(`${path} still points at the retired Canva host`);
   if (/MKasino/i.test(page.replace(/<a\b[^>]*href="[^"]*mkasino[^"]*"[^>]*>[\s\S]*?<\/a>/gi, ''))) throw new Error(`${path} still presents the retired MKasino brand`);
-  const blocked = [...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+  const blocked = scriptElements(page)
     .filter(match => !/\bsrc\s*=/.test(match[1]) && !/application\/ld\+json/.test(match[1]) && match[2].trim());
   if (blocked.length) throw new Error(`${path} has an inline script that the Content-Security-Policy would block`);
   if (!page.includes(`https://hillstreet.space/${slug}`)) throw new Error(`${path} is missing its canonical URL`);
@@ -36,7 +37,7 @@ for (const slug of agencySlugs) {
 await writeFile('site/build-info.json', JSON.stringify({ project: 'hillstreet', commit: process.env.CF_PAGES_COMMIT_SHA || 'local', built_at: new Date().toISOString() }) + '\n');
 const html = await readFile('site/index.html', 'utf8');
 if (!html.includes('/assets/website.js')) throw new Error('Website integration entry is missing');
-const hashes = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+const hashes = scriptElements(html)
   .filter(match => !/\bsrc\s*=/.test(match[1]) && match[2].trim())
   .map(match => "'sha256-" + createHash('sha256').update(match[2]).digest('base64') + "'");
 const policy = [
