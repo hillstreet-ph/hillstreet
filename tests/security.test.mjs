@@ -22,7 +22,7 @@ test('the script scanner matches every end-tag form a browser honours', () => {
   // `</script >` and its variants close a script in a real parser. A scanner that demands
   // the exact `</script>` form reports no element for them, so an inline script would
   // escape both the build guard and the CSP hash that whitelists it.
-  for (const form of ['</script>', '</script >', '</script\t>', '</script\n>', '</script/>', '</script  />']) {
+  for (const form of ['</script>', '</script >', '</script\t>', '</script\n>', '</script/>', '</script  />', '</script\t\n bar>']) {
     const page = `<html><body><script>fetch('/api')${form}</body></html>`;
     const found = scriptElements(page);
     assert.equal(found.length, 1, `a script closed with ${JSON.stringify(form)} hid from the scanner`);
