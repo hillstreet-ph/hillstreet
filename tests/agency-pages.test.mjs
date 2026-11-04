@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
+import { scriptElements } from '../src/html-scripts.mjs';
 
 const retiredRoutes = { mkasino: '/agency', aboutinfluencers: '/influencers', payment: '/cooperation' };
 const slugs = Object.values(retiredRoutes).map(route => route.slice(1));
@@ -17,7 +18,14 @@ function withoutExternalHandles(html) {
 
 test('agency pages replace the Canva host with same-origin routes', async () => {
   const source = await readFile('src/website.js', 'utf8');
-  assert.ok(source.includes('https://masterkanortv.my.canva.site'), 'the integration layer must know the retired host');
+  // Compare the whole declared origin instead of testing whether the URL appears as a
+  // substring: a substring match also succeeds on a host that merely ends with the retired
+  // one, which is exactly the ambiguity a rewriter must not have.
+  const declared = /const DECK_HOST = '([^']+)';/.exec(source)?.[1];
+  assert.ok(declared, 'src/website.js no longer declares the DECK_HOST constant the deck links are rewritten from');
+  const deckOrigin = new URL(declared);
+  assert.equal(deckOrigin.origin, 'https://masterkanortv.my.canva.site', 'the integration layer must know the retired host');
+  assert.equal(deckOrigin.pathname, '/', `${declared} must name the bare deck origin, not a deep link into it`);
   for (const [retired, route] of Object.entries(retiredRoutes)) {
     assert.ok(source.includes(`${retired}: '${route}'`), `src/website.js does not route ${retired} to ${route}`);
     assert.ok(pages[route.slice(1)].includes(`rel="canonical" href="https://hillstreet.space${route}"`));
@@ -62,10 +70,12 @@ test('retired pre-merge routes redirect to the single-brand routes', async () =>
 test('agency pages stay inside the shared Content-Security-Policy', async () => {
   const allowedLinks = new Set(['t.me', 'wa.me', 'www.facebook.com', 'www.youtube.com']);
   for (const slug of slugs) {
-    for (const match of pages[slug].matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+    for (const match of scriptElements(pages[slug])) {
       if (/\bsrc\s*=/.test(match[1])) continue;
       assert.match(match[1], /application\/ld\+json/, `site/${slug}/index.html has an executable inline script`);
     }
+    assert.equal(scriptElements(pages[slug]).length, (pages[slug].match(/<script\b/gi) || []).length,
+      `site/${slug}/index.html holds a <script> the shared scanner cannot close, so the CSP guard would skip it`);
     assert.ok(!/(?:<a\b[^>]*href|src)="https?:\/\/(?:www\.)?hillstreet\.space/.test(pages[slug]), `site/${slug}/index.html links its own domain absolutely`);
     for (const ref of pages[slug].matchAll(/<(?:a|img|video|source)\b[^>]*?(?:href|src)="((?:https?:)?\/\/[^"]+)"/g)) {
       const url = ref[1];
