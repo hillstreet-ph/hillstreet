@@ -56,3 +56,5 @@ Supabase project: `open-platform` (`huadtiuuoiriqrjpjxhr`). Dedicated table: `pu
 Sentry: organization `hillstreet`, project `hillstreet`. Browser errors use the public DSN. Session tracking, replay and performance tracing are not enabled. Request query strings and contact form values are excluded from the configured event pipeline. No original React source maps were available.
 
 The business domain is deployed and verified. Automatic production deployments are enabled. Website DNS was updated; email DNS was preserved. Google Workspace Admin is deferred and registrar-side DNSSEC remains pending.
+
+Nexus Development Cycle auto-merged by Hermes on 2026-11-04T20:31Z
