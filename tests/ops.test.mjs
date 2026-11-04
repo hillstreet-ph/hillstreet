@@ -15,6 +15,7 @@ test('health check accepts a valid site and contact validation response',async()
     visited.push(String(url));
     if(String(url).endsWith('/api/contact'))return new Response('{}',{status:400});
     if(String(url)==='https://hillstreet.space/')assert.equal(options.redirect,'manual');
+    if(/hillstreet\.space\/(agency|influencers|cooperation)$/.test(String(url)))assert.equal(options.redirect,'manual',`${url} was followed instead of answered directly`);
     return new Response('HillStreet Agency',{headers:{'Content-Security-Policy':"default-src 'self'"}});
   };
   try{
@@ -22,6 +23,16 @@ test('health check accepts a valid site and contact validation response',async()
     assert.equal(result.ok,true);assert.equal(stored,true);
     for(const path of ['/agency','/influencers','/cooperation'])assert.ok(visited.includes('https://hillstreet.space'+path),`health check skipped ${path}`);
   }
+  finally{globalThis.fetch=original;}
+});
+test('health check rejects a sub-page that redirects away from the route it claims',async()=>{
+  // Pages answers site/<slug>/index.html with a 308 to /<slug>/, so a followed redirect keeps
+  // the cron green while every declared canonical points at a URL that is not the one served.
+  const original=globalThis.fetch;
+  globalThis.fetch=async url=>String(url).endsWith('/agency')
+    ?new Response(null,{status:308,headers:{Location:'https://hillstreet.space/agency/'}})
+    :new Response('HillStreet Agency',{headers:{'Content-Security-Policy':"default-src 'self'"}});
+  try{await assert.rejects(health({BACKUPS:{put:async()=>{}}}),/\/agency: HTTP 308/);}
   finally{globalThis.fetch=original;}
 });
 test('health check fails when an agency sub-page is missing',async()=>{

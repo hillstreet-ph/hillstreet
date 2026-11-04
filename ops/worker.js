@@ -138,7 +138,9 @@ export async function health(env) {
   const root = await fetch('https://hillstreet.space/', { signal: AbortSignal.timeout(15000), redirect: 'manual' });
   if (root.status !== 200 || !(await root.text()).includes('HillStreet Agency') || !root.headers.has('Content-Security-Policy')) throw new Error('Website health check failed: HTTP '+root.status);
   for (const path of SUBPAGES) {
-    const page = await fetch('https://hillstreet.space'+path, { signal:AbortSignal.timeout(15000) });
+    // redirect: 'manual' makes the check answer for the exact route the site links and each
+    // page declares as canonical; following a 308 to a trailing-slash copy would hide the drift.
+    const page = await fetch('https://hillstreet.space'+path, { signal:AbortSignal.timeout(15000), redirect:'manual' });
     const body = await page.text();
     const failure = page.status !== 200 ? 'HTTP '+page.status : !page.headers.has('Content-Security-Policy') ? 'missing Content-Security-Policy' : body.includes('canva.site') ? 'retired Canva host still referenced' : null;
     if (failure) throw new Error('Sub-page health check failed for '+path+': '+failure);

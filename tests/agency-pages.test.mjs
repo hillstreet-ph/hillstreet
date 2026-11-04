@@ -5,7 +5,7 @@ import { scriptElements } from '../src/html-scripts.mjs';
 
 const retiredRoutes = { mkasino: '/agency', aboutinfluencers: '/influencers', payment: '/cooperation' };
 const slugs = Object.values(retiredRoutes).map(route => route.slice(1));
-const pages = Object.fromEntries(await Promise.all(slugs.map(async slug => [slug, await readFile(`site/${slug}/index.html`, 'utf8')])));
+const pages = Object.fromEntries(await Promise.all(slugs.map(async slug => [slug, await readFile(`site/${slug}.html`, 'utf8')])));
 
 async function exists(path) {
   try { await access(path); return true; } catch { return false; }
@@ -30,16 +30,34 @@ test('agency pages replace the Canva host with same-origin routes', async () => 
     assert.ok(source.includes(`${retired}: '${route}'`), `src/website.js does not route ${retired} to ${route}`);
     assert.ok(pages[route.slice(1)].includes(`rel="canonical" href="https://hillstreet.space${route}"`));
   }
-  for (const slug of slugs) assert.ok(!pages[slug].includes('canva.site'), `site/${slug}/index.html still references Canva`);
+  for (const slug of slugs) assert.ok(!pages[slug].includes('canva.site'), `site/${slug}.html still references Canva`);
   const bundle = await readFile('site/assets/index-D4yBHoPu.js', 'utf8');
   assert.ok(bundle.includes('masterkanortv.my.canva.site'), 'the recovered bundle is the source of the outbound links the integration layer rewrites');
+});
+
+// Pages serves site/<slug>.html at /<slug> with HTTP 200, but site/<slug>/index.html only
+// at /<slug>/ after a 308 away from /<slug>. Every link, the sitemap and each declared
+// canonical use the slash-free route, so the directory form would advertise a URL that
+// redirects somewhere other than itself.
+test('sub-page routes are the flat files Pages serves at their declared canonical', async () => {
+  const { SITE_NAV } = await import('../src/site-nav.mjs');
+  for (const slug of slugs) {
+    assert.ok(await exists(`site/${slug}.html`), `site/${slug}.html is missing`);
+    assert.equal(await exists(`site/${slug}/index.html`), false, `site/${slug}/index.html answers /${slug} with a 308 away from its canonical`);
+    const canonicals = [...pages[slug].matchAll(/rel="canonical" href="([^"]+)"/g)].map(match => match[1]);
+    assert.deepEqual(canonicals, [`https://hillstreet.space/${slug}`], `site/${slug}.html must declare exactly the route it is served at`);
+  }
+  for (const { href, label } of SITE_NAV.filter(entry => entry.href.startsWith('/') && !entry.href.includes('#'))) {
+    const file = href === '/' ? 'site/index.html' : `site${href}.html`;
+    assert.ok(await exists(file), `${label} navigates to ${href}, which no flat page answers with HTTP 200`);
+  }
 });
 
 test('HillStreet is the only brand the agency pages present', async () => {
   for (const slug of slugs) {
     const html = withoutExternalHandles(pages[slug]);
-    assert.ok(!/MKasino|MKASINO/i.test(html), `site/${slug}/index.html still presents the retired MKasino brand`);
-    assert.ok(!/class="eyebrow"[^>]*>\s*Legacy/i.test(html), `site/${slug}/index.html still labels itself legacy`);
+    assert.ok(!/MKasino|MKASINO/i.test(html), `site/${slug}.html still presents the retired MKasino brand`);
+    assert.ok(!/class="eyebrow"[^>]*>\s*Legacy/i.test(html), `site/${slug}.html still labels itself legacy`);
   }
   const source = await readFile('src/website.js', 'utf8');
   assert.ok(source.includes('MKasino Marketing Agency'), 'the integration layer relabels the deck card the recovered bundle renders');
@@ -72,17 +90,17 @@ test('agency pages stay inside the shared Content-Security-Policy', async () => 
   for (const slug of slugs) {
     for (const match of scriptElements(pages[slug])) {
       if (/\bsrc\s*=/.test(match[1])) continue;
-      assert.match(match[1], /application\/ld\+json/, `site/${slug}/index.html has an executable inline script`);
+      assert.match(match[1], /application\/ld\+json/, `site/${slug}.html has an executable inline script`);
     }
     assert.equal(scriptElements(pages[slug]).length, (pages[slug].match(/<script\b/gi) || []).length,
-      `site/${slug}/index.html holds a <script> the shared scanner cannot close, so the CSP guard would skip it`);
-    assert.ok(!/(?:<a\b[^>]*href|src)="https?:\/\/(?:www\.)?hillstreet\.space/.test(pages[slug]), `site/${slug}/index.html links its own domain absolutely`);
+      `site/${slug}.html holds a <script> the shared scanner cannot close, so the CSP guard would skip it`);
+    assert.ok(!/(?:<a\b[^>]*href|src)="https?:\/\/(?:www\.)?hillstreet\.space/.test(pages[slug]), `site/${slug}.html links its own domain absolutely`);
     for (const ref of pages[slug].matchAll(/<(?:a|img|video|source)\b[^>]*?(?:href|src)="((?:https?:)?\/\/[^"]+)"/g)) {
       const url = ref[1];
       if (url.startsWith('//')) continue;
       const { protocol, host } = new URL(url);
-      if (protocol === 'http:') assert.fail(`site/${slug}/index.html links ${url} over plain http`);
-      assert.ok(allowedLinks.has(host), `site/${slug}/index.html links ${host}; only messaging and social profiles may leave the origin`);
+      if (protocol === 'http:') assert.fail(`site/${slug}.html links ${url} over plain http`);
+      assert.ok(allowedLinks.has(host), `site/${slug}.html links ${host}; only messaging and social profiles may leave the origin`);
     }
   }
 });
@@ -93,7 +111,7 @@ test('every same-origin reference on an agency page resolves in site/', async ()
     for (const ref of refs) {
       const found = await Promise.all([`site${ref}`, `${ref}.html`, `${ref.replace(/\/$/, '')}/index.html`]
         .map(value => exists(value.startsWith('site') ? value : `site${value}`)));
-      assert.ok(found.some(Boolean), `site/${slug}/index.html links ${ref}, which is missing`);
+      assert.ok(found.some(Boolean), `site/${slug}.html links ${ref}, which is missing`);
     }
   }
 });
@@ -103,7 +121,7 @@ test('agency media is self-hosted and declares its intrinsic size', async () => 
     for (const img of pages[slug].matchAll(/<img\b([^>]*)>/g)) {
       const attrs = img[1];
       const src = /src="([^"]+)"/.exec(attrs)?.[1];
-      assert.ok(src?.startsWith('/'), `site/${slug}/index.html loads remote image ${src}`);
+      assert.ok(src?.startsWith('/'), `site/${slug}.html loads remote image ${src}`);
       assert.ok(/alt="[^"]+"/.test(attrs), `${src} needs a non-empty alt description`);
       assert.match(attrs, /width="\d+"/, `${src} needs a width`);
       assert.match(attrs, /height="\d+"/, `${src} needs a height`);
@@ -121,25 +139,25 @@ test('one contact authority serves every agency page', async () => {
   for (const slug of slugs) {
     const html = pages[slug];
     for (const btn of html.matchAll(/<a class="btn[^"]*" href="([^"]+)"/g)) {
-      if (btn[1].startsWith('https://t.me/')) assert.equal(btn[1], primary.telegram, `site/${slug}/index.html sends a button to ${btn[1]}`);
+      if (btn[1].startsWith('https://t.me/')) assert.equal(btn[1], primary.telegram, `site/${slug}.html sends a button to ${btn[1]}`);
     }
     const body = /<main[\s\S]*<\/main>/.exec(html)[0];
     for (const route of [primary.whatsapp, primary.email, primary.telegram]) {
-      assert.ok(body.includes(route), `site/${slug}/index.html body is missing ${route}`);
+      assert.ok(body.includes(route), `site/${slug}.html body is missing ${route}`);
     }
     assert.equal([...body.matchAll(/href="\/"[^>]*>(?:Go back home|Back to HillStreet Agency)</g)].length, 0,
-      `site/${slug}/index.html repeats the home link the header nav already carries`);
+      `site/${slug}.html repeats the home link the header nav already carries`);
     // Archived deck routes stay as records only: outside .deck-record they would read as live contacts.
     const withoutRecords = body.replace(/<div class="deck-record">[\s\S]*?<\/div>/g, '');
     for (const retired of ['945 263 9539', 'masterkanortv@gmail.com']) {
-      assert.ok(!new RegExp(retired, 'i').test(withoutRecords), `site/${slug}/index.html presents ${retired} as a live contact`);
+      assert.ok(!new RegExp(retired, 'i').test(withoutRecords), `site/${slug}.html presents ${retired} as a live contact`);
     }
     // The eight-team Telegram table is published routing; retired handles may appear there, nowhere else in the body.
     const outsideTables = withoutRecords.replace(/<table[\s\S]*?<\/table>/g, '').replace(/<a class="btn[^>]*>[\s\S]*?<\/a>/g, '');
     for (const retired of ['MasterkanorSupport', 'mksupport143']) {
-      assert.ok(!new RegExp(retired, 'i').test(outsideTables), `site/${slug}/index.html offers ${retired} outside the published team table`);
+      assert.ok(!new RegExp(retired, 'i').test(outsideTables), `site/${slug}.html offers ${retired} outside the published team table`);
     }
-    assert.match(body, /deck-record/, `site/${slug}/index.html must keep the archived deck record`);
+    assert.match(body, /deck-record/, `site/${slug}.html must keep the archived deck record`);
   }
 });
 
@@ -204,7 +222,7 @@ test('one identity set serves every page', async () => {
   // The header mark is the tight crop, not the padded export it was cut from.
   for (const slug of slugs) {
     assert.match(pages[slug], /<img src="\/images\/brand\/brand-mark-128\.png" alt="HillStreet Agency logo" width="32" height="32">/,
-      `site/${slug}/index.html still renders the padded logo in the header`);
+      `site/${slug}.html still renders the padded logo in the header`);
   }
   const integration = await readFile('src/website.js', 'utf8');
   assert.ok(integration.includes('img[src="/images/logo-hillstreet.png"]'), 'the home bundle logo is swapped at runtime');
@@ -219,9 +237,9 @@ test('every video ships a poster and reserves its box', async () => {
     for (const video of pages[slug].matchAll(/<video\b([^>]*)>/g)) {
       const attrs = video[1];
       const src = /src="([^"]+)"/.exec(attrs)?.[1];
-      assert.ok(src, `site/${slug}/index.html has a video with no source`);
+      assert.ok(src, `site/${slug}.html has a video with no source`);
       const poster = /poster="(\/[^"]+)"/.exec(attrs)?.[1];
-      assert.ok(poster, `site/${slug}/index.html plays ${src} with no poster`);
+      assert.ok(poster, `site/${slug}.html plays ${src} with no poster`);
       assert.ok(await exists(`site${poster}`), `${poster} is not present in site/`);
       const [, w, h] = /width="(\d+)" height="(\d+)"/.exec(attrs);
       const [pw, ph] = jpegSize(await readFile(`site${poster}`));
@@ -263,7 +281,7 @@ test('agency pages keep one document outline and a route back to HillStreet', as
   for (const slug of slugs) {
     const html = pages[slug];
     assert.match(html, /<html lang="en"/);
-    assert.equal([...html.matchAll(/<h1\b/g)].length, 1, `site/${slug}/index.html needs exactly one h1`);
+    assert.equal([...html.matchAll(/<h1\b/g)].length, 1, `site/${slug}.html needs exactly one h1`);
     assert.match(html, /class="skip-link"/);
     assert.match(html, /<header class="site-header"/);
     assert.match(html, /<nav aria-label="Site"/);
@@ -273,7 +291,7 @@ test('agency pages keep one document outline and a route back to HillStreet', as
     assert.match(html, /href="\/"/);
     assert.match(html, /contact@hillstreet\.space/);
     assert.match(html, /href="\/privacy"/);
-    for (const other of slugs) assert.ok(html.includes(`href="/${other}"`), `site/${slug}/index.html should link /${other}`);
+    for (const other of slugs) assert.ok(html.includes(`href="/${other}"`), `site/${slug}.html should link /${other}`);
   }
 });
 
@@ -286,13 +304,13 @@ test('every sub-page renders the shared SITE_NAV list', async () => {
   assert.match(css, /\.nav-check:checked ~ \.nav/, 'agency.css is missing the script-free menu disclosure');
   for (const slug of slugs) {
     const nav = /<nav aria-label="Site">[\s\S]*?<\/nav>/.exec(pages[slug])?.[0];
-    assert.ok(nav, `site/${slug}/index.html has no Site nav`);
-    assert.equal(trimLines(nav), trimLines(navBlock(`/${slug}`)), `site/${slug}/index.html drifted from src/site-nav.mjs`);
+    assert.ok(nav, `site/${slug}.html has no Site nav`);
+    assert.equal(trimLines(nav), trimLines(navBlock(`/${slug}`)), `site/${slug}.html drifted from src/site-nav.mjs`);
     // The sub-pages ship no scripts, so the mobile menu opens with a CSS-only checkbox.
     assert.match(pages[slug], /<input class="nav-check"[^>]*id="nav-toggle">/);
     assert.match(pages[slug], /<label class="nav-fold" for="nav-toggle">Menu<\/label>/);
     for (const { href, label } of SITE_NAV)
-      assert.ok(nav.includes(`href="${href}"`), `${label} is missing from the site/${slug}/index.html header menu`);
+      assert.ok(nav.includes(`href="${href}"`), `${label} is missing from the site/${slug}.html header menu`);
   }
 });
 
@@ -304,11 +322,11 @@ test('footers carry the same site map and the home integration follows SITE_NAV'
   assert.match(integration, /a\[href="#"\]/, 'dead brand links must be pointed at the top of the site');
   assert.match(integration, /function landHash\(\)/, 'section links arriving from the sub-pages must re-apply the hash after the bundle mounts');
   for (const slug of slugs) {
-    assert.match(pages[slug], /<h4>Explore<\/h4>/, `site/${slug}/index.html footer lost the shared site map`);
+    assert.match(pages[slug], /<h4>Explore<\/h4>/, `site/${slug}.html footer lost the shared site map`);
     const footer = /<footer class="site-footer">[\s\S]*?<\/footer>/.exec(pages[slug])?.[0];
-    assert.ok(footer, `site/${slug}/index.html lost its footer`);
+    assert.ok(footer, `site/${slug}.html lost its footer`);
     for (const { href, label } of SITE_NAV)
-      assert.ok(footer.includes(`href="${href}"`), `${label} is missing from the site/${slug}/index.html footer`);
+      assert.ok(footer.includes(`href="${href}"`), `${label} is missing from the site/${slug}.html footer`);
   }
 });
 

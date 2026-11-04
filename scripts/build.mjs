@@ -7,16 +7,29 @@ await build({ entryPoints: ['src/website.js'], bundle: true, minify: true, forma
 for (const path of ['site/index.html','site/assets/index-D4yBHoPu.js','site/assets/index-DwciAvas.css','site/images/business-meeting-proof.mp4']) await access(path);
 
 // Agency sub-pages are same-origin, script-free static routes under the shared CSP.
+// Each page is a flat site/<slug>.html: Pages serves that file at /<slug> with HTTP 200, so
+// the URL the site links and the canonical each page declares is the URL actually served.
+// The directory form (site/<slug>/index.html) answers /<slug> with a 308 to /<slug>/, which
+// makes every declared canonical point at a URL that redirects somewhere else.
 const agencySlugs = ['agency', 'influencers', 'cooperation'];
 for (const slug of agencySlugs) {
-  const path = `site/${slug}/index.html`;
+  const path = `site/${slug}.html`;
   const page = await readFile(path, 'utf8');
   if (page.includes('canva.site')) throw new Error(`${path} still points at the retired Canva host`);
   if (/MKasino/i.test(page.replace(/<a\b[^>]*href="[^"]*mkasino[^"]*"[^>]*>[\s\S]*?<\/a>/gi, ''))) throw new Error(`${path} still presents the retired MKasino brand`);
   const blocked = scriptElements(page)
     .filter(match => !/\bsrc\s*=/.test(match[1]) && !/application\/ld\+json/.test(match[1]) && match[2].trim());
   if (blocked.length) throw new Error(`${path} has an inline script that the Content-Security-Policy would block`);
-  if (!page.includes(`https://hillstreet.space/${slug}`)) throw new Error(`${path} is missing its canonical URL`);
+  const canonical = /rel="canonical" href="([^"]+)"/.exec(page)?.[1];
+  if (canonical !== `https://hillstreet.space/${slug}`) {
+    throw new Error(`${path} declares ${canonical || 'no canonical'}; the canonical must be the exact route Pages serves`);
+  }
+  try {
+    await access(`site/${slug}/index.html`);
+    throw new Error(`site/${slug}/index.html duplicates the ${path} route; Pages would answer /${slug} with a 308 away from its canonical`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
   const normalise = value => value.split('\n').map(line => line.trim()).filter(Boolean).join('\n');
   const pageNav = /<nav aria-label="Site">[\s\S]*?<\/nav>/.exec(page)?.[0];
   if (!pageNav) throw new Error(`${path} is missing its Site nav`);

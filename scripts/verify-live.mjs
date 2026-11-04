@@ -51,6 +51,15 @@ if (served) {
       check(response.headers.has('Content-Security-Policy'), `${route} is missing its Content-Security-Policy`);
       check((response.headers.get('Strict-Transport-Security') || '').includes('max-age=31536000'), `${route} is missing HSTS`);
       check(response.headers.get('X-Content-Type-Options') === 'nosniff', `${route} is missing X-Content-Type-Options: nosniff`);
+      // Each page declares a canonical on the hillstreet.space host, so the route is compared
+      // by path: the deployment answers under a pages.dev origin. A page that redirects, or
+      // that declares a canonical for some other path, tells crawlers to prefer a URL that is
+      // not the one being served.
+      check(response.redirected === false, `${base}${route} redirected to ${response.url}; a page must answer its own route directly`);
+      const canonical = /rel="canonical" href="([^"]+)"/.exec(body)?.[1];
+      let canonicalPath = '';
+      try { canonicalPath = new URL(canonical).pathname; } catch { canonicalPath = `unreadable (${canonical ?? 'none'})`; }
+      check(canonicalPath === route, `${route} declares the canonical ${canonicalPath}, which is not the route it is served at`);
     }
     if (subPages.includes(route)) for (const entry of SITE_NAV) check(body.includes(`href="${entry.href}"`), `${route} is missing the ${entry.label} navigation button`);
     // The home page renders its menu from the bundle, so its buttons live in the script text.
